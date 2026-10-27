@@ -1,1 +1,1 @@
-export function trimGreeting(value) { return value; }
+export function trimGreeting(value) { return value.replace(/^ +| +$/g, ''); }
