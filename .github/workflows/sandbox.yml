@@ -1,0 +1,21 @@
+name: Sandbox CI
+on:
+  pull_request:
+  push:
+    branches: [main]
+  merge_group:
+permissions:
+  contents: read
+jobs:
+  verify:
+    name: Sandbox checks
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Keep the queue observable for restart checks
+        if: github.event_name == 'merge_group'
+        run: sleep 15
+      - run: node --test

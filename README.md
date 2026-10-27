@@ -1,2 +1,3 @@
-# poise-v2-local-20261027
-Disposable Poise v2 local execution validation; no production integration.
+# Disposable Poise v2 sandbox
+
+Toy work only. No production deployment, upstream fork, production credentials, or production work references. All orchestration runs locally.
