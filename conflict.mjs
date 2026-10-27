@@ -1,1 +1,2 @@
-export const fixtureValue = 'B';
+export const fixtureValue = 'A';
+export const concurrentValue = 'B';
