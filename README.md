@@ -16,6 +16,8 @@ chunk([1, 2], 3);          // [[1, 2]] (a copied chunk)
 their original order, retaining a final partial chunk. Every call creates a new
 outer array and new chunk arrays, including when the size equals or exceeds the
 input length. Empty inputs produce a new empty array with no chunks.
+Array subclasses are accepted, but the returned outer array and chunks are
+ordinary arrays. The input's `constructor` and `Symbol.species` hooks are not used.
 
 This is a shallow, non-mutating operation: it does not modify or freeze the input
 or its elements, and frozen arrays are accepted. Object and nested-array element
@@ -23,8 +25,10 @@ references are preserved. Replacing a slot in a chunk does not change the source
 array or sibling chunks; modifying a shared element object remains visible
 through all references to that object.
 
-Sparse arrays follow `Array.prototype.slice` semantics. Holes count toward chunk
-boundaries and lengths and remain holes, distinct from explicit `undefined`:
+Sparse slots follow `Array.prototype.slice` property-presence semantics. Holes
+count toward chunk boundaries and lengths and remain holes, distinct from
+explicit `undefined`. Inherited indexed values are copied into own chunk slots,
+as with slicing:
 
 ```js
 const parts = chunk([, 'a', undefined, , 'b'], 2);

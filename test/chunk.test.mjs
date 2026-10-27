@@ -127,6 +127,66 @@ test('chunk retains all-hole chunks, including the partial tail', () => {
   assert.deepEqual(items, new Array(3));
 });
 
+test('chunk returns ordinary arrays when an Array subclass specifies Object species', () => {
+  class Items extends Array {
+    static get [Symbol.species]() { return Object; }
+  }
+  const items = new Items(1, 2);
+  const before = Object.getOwnPropertyDescriptors(items);
+
+  for (const size of [1, 2, Number.MAX_SAFE_INTEGER]) {
+    const result = chunk(items, size);
+    assert.deepEqual(result, size === 1 ? [[1], [2]] : [[1, 2]]);
+    assert.deepEqual(result.map(part => part.map(value => value * 2)),
+      size === 1 ? [[2], [4]] : [[2, 4]]);
+    assert.strictEqual(Object.getPrototypeOf(result), Array.prototype);
+    for (const part of result) {
+      assert.equal(Array.isArray(part), true);
+      assert.strictEqual(Object.getPrototypeOf(part), Array.prototype);
+      assert.notStrictEqual(part, items);
+    }
+  }
+  assert.deepEqual(Object.getOwnPropertyDescriptors(items), before);
+});
+
+test('chunk does not consult input constructor or species hooks', () => {
+  class Items extends Array {
+    static get [Symbol.species]() { assert.fail('must not read species'); }
+  }
+  const plain = [1, 2];
+  Object.defineProperty(plain, 'constructor', {
+    get() { assert.fail('must not read constructor'); },
+  });
+  for (const items of [new Items(1, 2), plain]) {
+    assert.deepEqual(chunk(items, 1), [[1], [2]]);
+  }
+});
+
+test('chunk preserves holes and inherited indexed values in frozen Array subclasses', () => {
+  class Items extends Array {
+    static get [Symbol.species]() { return Object; }
+  }
+  const shared = { value: 1 };
+  Items.prototype[4] = shared;
+  const items = new Items(5);
+  items[1] = 'a';
+  items[2] = undefined;
+  Object.freeze(items);
+  const before = Object.getOwnPropertyDescriptors(items);
+
+  const result = chunk(items, 2);
+
+  assert.deepEqual(result, [[, 'a'], [undefined, ,], [shared]]);
+  assert.deepEqual(result.map(part => part.length), [2, 2, 1]);
+  assert.equal(Object.hasOwn(result[0], 0), false);
+  assert.equal(Object.hasOwn(result[1], 0), true);
+  assert.equal(Object.hasOwn(result[1], 1), false);
+  assert.equal(Object.hasOwn(items, 4), false);
+  assert.equal(Object.hasOwn(result[2], 0), true);
+  assert.strictEqual(result[2][0], shared);
+  assert.deepEqual(Object.getOwnPropertyDescriptors(items), before);
+});
+
 test('chunk rejects non-Array inputs with TypeError', () => {
   for (const items of [null, undefined, 'abc', 3, true, {}, { 0: 'a', length: 1 },
     new Set([1]), new Uint8Array([1]), new ArrayBuffer(1)]) {
