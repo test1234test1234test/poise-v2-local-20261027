@@ -160,6 +160,40 @@ uses Map/Set key equality, and skips sparse holes and inherited indexed values.
 See [the contract and examples](docs/unique-by.md) for validation, traversal, and
 callback side-effect behavior.
 
+## Newline normalization
+
+Import the named `normalizeNewlines(text)` function from `lib/normalize-newlines.mjs`:
+
+```js
+import { normalizeNewlines } from './lib/normalize-newlines.mjs';
+
+normalizeNewlines('');                 // ''
+normalizeNewlines('a');                // 'a'
+normalizeNewlines('a\n\nb\n');         // 'a\n\nb\n'
+normalizeNewlines('a\r\nb\rc\n');      // 'a\nb\nc\n'
+normalizeNewlines('\r\r\n');           // '\n\n'
+normalizeNewlines('\n\r');             // '\n\n'
+normalizeNewlines('a\r\n\r\n');        // 'a\n\n'
+normalizeNewlines('a\r');              // 'a\n'
+normalizeNewlines('a\r\n \t');         // 'a\n \t'
+normalizeNewlines('\\r\\n');           // '\\r\\n' (literal backslashes)
+```
+
+`text` is a string, and the return value is a string. Each immediately adjacent
+CRLF pair becomes one LF; each remaining CR becomes one LF. Existing LF stays
+unchanged. Leading, interior, and trailing blank lines are preserved. Trailing
+line endings retain their presence and multiplicity, with their spelling
+converted to LF. No final newline is added to unterminated input.
+
+All other UTF-16 code units are preserved exactly, including spaces, tabs,
+U+0085, U+2028, U+2029, vertical tab, form feed, BOM, NUL, combining sequences,
+and isolated surrogates. Whitespace is not trimmed, and literal backslash
+escapes are not decoded. Applying the function again leaves the result unchanged.
+Non-string inputs are outside this function's contract.
+
+Normalization is opt-in for callers; `countLines` and `parseCsv` retain their
+existing newline rules.
+
 ## HTML text escaping
 
 Import the named `escapeHtml(text)` function to serialize ordinary HTML text
@@ -189,6 +223,12 @@ describes the JavaScript string result, not a browser parse/render round trip.
 
 Use this helper for ordinary HTML text serialization. It is not an HTML sanitizer
 or an encoder for JavaScript, CSS or URLs.
+
+## Asynchronous semaphore
+
+Import `AsyncSemaphore` from `lib/async-semaphore.mjs` for fair, cancellable
+permits that bound concurrent work. Acquire before the work and release in
+`finally`; see [usage and the ownership contract](docs/async-semaphore.md).
 
 ## Query string parsing
 
