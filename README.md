@@ -181,3 +181,9 @@ describes the JavaScript string result, not a browser parse/render round trip.
 
 Use this helper for ordinary HTML text serialization. It is not an HTML sanitizer
 or an encoder for JavaScript, CSS or URLs.
+
+## Asynchronous semaphore
+
+Import `AsyncSemaphore` from `lib/async-semaphore.mjs` for fair, cancellable
+permits that bound concurrent work. Acquire before the work and release in
+`finally`; see [usage and the ownership contract](docs/async-semaphore.md).
