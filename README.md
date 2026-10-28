@@ -91,3 +91,37 @@ whitespace-only lines still count. Lone CR, U+2028, U+2029, and U+0085 are
 ordinary content. Non-string inputs are outside this function's contract.
 
 Run all tests with `node --test` (or `npm test`).
+
+## Newline normalization
+
+Import the named `normalizeNewlines(text)` function from `lib/normalize-newlines.mjs`:
+
+```js
+import { normalizeNewlines } from './lib/normalize-newlines.mjs';
+
+normalizeNewlines('');                 // ''
+normalizeNewlines('a');                // 'a'
+normalizeNewlines('a\n\nb\n');         // 'a\n\nb\n'
+normalizeNewlines('a\r\nb\rc\n');      // 'a\nb\nc\n'
+normalizeNewlines('\r\r\n');           // '\n\n'
+normalizeNewlines('\n\r');             // '\n\n'
+normalizeNewlines('a\r\n\r\n');        // 'a\n\n'
+normalizeNewlines('a\r');              // 'a\n'
+normalizeNewlines('a\r\n \t');         // 'a\n \t'
+normalizeNewlines('\\r\\n');           // '\\r\\n' (literal backslashes)
+```
+
+`text` is a string, and the return value is a string. Each immediately adjacent
+CRLF pair becomes one LF; each remaining CR becomes one LF. Existing LF stays
+unchanged. Leading, interior, and trailing blank lines are preserved. Trailing
+line endings retain their presence and multiplicity, with their spelling
+converted to LF. No final newline is added to unterminated input.
+
+All other UTF-16 code units are preserved exactly, including spaces, tabs,
+U+0085, U+2028, U+2029, vertical tab, form feed, BOM, NUL, combining sequences,
+and isolated surrogates. Whitespace is not trimmed, and literal backslash
+escapes are not decoded. Applying the function again leaves the result unchanged.
+Non-string inputs are outside this function's contract.
+
+Normalization is opt-in for callers; `countLines` and `parseCsv` retain their
+existing newline rules.
