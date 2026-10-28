@@ -47,6 +47,66 @@ infinities, and unsafe integers. `Number.MAX_SAFE_INTEGER` is valid; an oversize
 size copies only the available elements, without padding or allocating to that
 size.
 
+## Array pagination
+
+```js
+import { paginate } from './lib/paginate.mjs';
+
+paginate([], 1, 2);
+// { items: [], page: 1, pageSize: 2, totalItems: 0, totalPages: 0,
+//   hasPrevious: false, hasNext: false }
+
+paginate([1, 2, 3, 4, 5], 3, 2);
+// { items: [5], page: 3, pageSize: 2, totalItems: 5, totalPages: 3,
+//   hasPrevious: true, hasNext: false }
+
+paginate([1, 2, 3, 4, 5], 4, 2);
+// { items: [], page: 4, pageSize: 2, totalItems: 5, totalPages: 3,
+//   hasPrevious: true, hasNext: false }
+```
+
+`paginate(items, page, pageSize)` selects a contiguous, one-based page. It echoes
+the requested `page` and `pageSize`, including beyond the last page. `totalItems`
+is the source length, including holes; `totalPages` is
+`Math.ceil(totalItems / pageSize)`, or zero for an empty source. `hasPrevious` is
+true when `totalPages > 0 && page > 1`: some existing page is earlier, even if the
+immediately preceding page does not exist. `hasNext` is true when
+`page < totalPages`. Both flags are false for every request on an empty source.
+
+Every call returns a fresh ordinary items array, including empty results and
+pages that cover the whole source. Copying is shallow: object and nested-array
+references are preserved. The source and its elements are never modified or
+frozen; frozen sources, Array subclasses, and arrays from other realms are
+accepted. No input constructor or `Symbol.species` hook is used.
+
+Sparse holes count toward page boundaries and remain absent own slots, including
+trailing holes. Explicit own `undefined` and non-enumerable own indices are
+copied. Unlike `chunk`, pagination ignores inherited indexed properties and does
+not read their getters. The result still inherits from `Array.prototype`.
+
+```js
+const result = paginate([1, , undefined, ,], 2, 2);
+result.items.length;               // 2
+Object.hasOwn(result.items, 0);     // true (explicit undefined)
+Object.hasOwn(result.items, 1);     // false (hole)
+```
+
+All arguments are required and validated even for empty sources or pages beyond
+the end. A non-Array `items` or any non-number `page` or `pageSize` throws
+`TypeError`, including boxed numbers, objects, and functions. Arguments are never
+coerced. Primitive numbers that are not positive safe integers throw
+`RangeError`: zero (including `-0`), negatives, fractions, `NaN`, infinities, and
+unsafe integers are invalid. `Number.MAX_SAFE_INTEGER` is valid for either or
+both numeric arguments. Only the selected range is allocated, without padding
+to `pageSize` or calculating an oversized page offset:
+
+```js
+const max = Number.MAX_SAFE_INTEGER;
+paginate([1, 2], 1, max).items;   // [1, 2] (a fresh copy)
+paginate([1, 2], max, max).items; // [] (hasPrevious: true, hasNext: false)
+paginate([], max, max).items;     // [] (both navigation flags false)
+```
+
 ## Numeric clamp
 
 Import the named `clamp(value, min, max)` export from `lib/clamp.mjs`:
