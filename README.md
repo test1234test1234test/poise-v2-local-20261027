@@ -187,3 +187,10 @@ or an encoder for JavaScript, CSS or URLs.
 Import `AsyncSemaphore` from `lib/async-semaphore.mjs` for fair, cancellable
 permits that bound concurrent work. Acquire before the work and release in
 `finally`; see [usage and the ownership contract](docs/async-semaphore.md).
+
+## Query string parsing
+
+Import `parseQueryString` from `./lib/parse-query-string.mjs` to parse query text
+into a null-prototype object of string arrays, preserving repeated values in
+order. See the [parsing and error contract](docs/parse-query-string.md) for
+strict percent decoding, literal-key behavior, and examples.
