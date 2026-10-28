@@ -91,3 +91,33 @@ whitespace-only lines still count. Lone CR, U+2028, U+2029, and U+0085 are
 ordinary content. Non-string inputs are outside this function's contract.
 
 Run all tests with `node --test` (or `npm test`).
+
+## HTML text escaping
+
+Import the named `escapeHtml(text)` function to serialize ordinary HTML text
+content:
+
+```js
+import { escapeHtml } from './lib/escape-html.mjs';
+
+const markup = '<p>' + escapeHtml('Tom & <Ada>') + '</p>';
+// '<p>Tom &amp; &lt;Ada&gt;</p>'
+
+escapeHtml(`&<>"'`); // '&amp;&lt;&gt;&quot;&#39;'
+escapeHtml('&amp;'); // '&amp;amp;'
+escapeHtml('');      // ''
+```
+
+Every `&`, `<`, `>`, `"` and `'` is replaced with `&amp;`, `&lt;`, `&gt;`,
+`&quot;` and `&#39;`, respectively. Existing entities are ordinary input: their
+ampersands are escaped again, so repeated escaping is intentionally not
+idempotent.
+
+Only primitive strings are accepted. Non-string values, including boxed strings
+and omitted arguments, throw `TypeError` without coercion. The returned string
+preserves every other code unit, including Unicode, lone surrogates, whitespace,
+line endings, BOM and NUL; empty input returns an empty string. This preservation
+describes the JavaScript string result, not a browser parse/render round trip.
+
+Use this helper for ordinary HTML text serialization. It is not an HTML sanitizer
+or an encoder for JavaScript, CSS or URLs.
