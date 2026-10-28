@@ -47,6 +47,66 @@ infinities, and unsafe integers. `Number.MAX_SAFE_INTEGER` is valid; an oversize
 size copies only the available elements, without padding or allocating to that
 size.
 
+## Array pagination
+
+```js
+import { paginate } from './lib/paginate.mjs';
+
+paginate([], 1, 2);
+// { items: [], page: 1, pageSize: 2, totalItems: 0, totalPages: 0,
+//   hasPrevious: false, hasNext: false }
+
+paginate([1, 2, 3, 4, 5], 3, 2);
+// { items: [5], page: 3, pageSize: 2, totalItems: 5, totalPages: 3,
+//   hasPrevious: true, hasNext: false }
+
+paginate([1, 2, 3, 4, 5], 4, 2);
+// { items: [], page: 4, pageSize: 2, totalItems: 5, totalPages: 3,
+//   hasPrevious: true, hasNext: false }
+```
+
+`paginate(items, page, pageSize)` selects a contiguous, one-based page. It echoes
+the requested `page` and `pageSize`, including beyond the last page. `totalItems`
+is the source length, including holes; `totalPages` is
+`Math.ceil(totalItems / pageSize)`, or zero for an empty source. `hasPrevious` is
+true when `totalPages > 0 && page > 1`: some existing page is earlier, even if the
+immediately preceding page does not exist. `hasNext` is true when
+`page < totalPages`. Both flags are false for every request on an empty source.
+
+Every call returns a fresh ordinary items array, including empty results and
+pages that cover the whole source. Copying is shallow: object and nested-array
+references are preserved. The source and its elements are never modified or
+frozen; frozen sources, Array subclasses, and arrays from other realms are
+accepted. No input constructor or `Symbol.species` hook is used.
+
+Sparse holes count toward page boundaries and remain absent own slots, including
+trailing holes. Explicit own `undefined` and non-enumerable own indices are
+copied. Unlike `chunk`, pagination ignores inherited indexed properties and does
+not read their getters. The result still inherits from `Array.prototype`.
+
+```js
+const result = paginate([1, , undefined, ,], 2, 2);
+result.items.length;               // 2
+Object.hasOwn(result.items, 0);     // true (explicit undefined)
+Object.hasOwn(result.items, 1);     // false (hole)
+```
+
+All arguments are required and validated even for empty sources or pages beyond
+the end. A non-Array `items` or any non-number `page` or `pageSize` throws
+`TypeError`, including boxed numbers, objects, and functions. Arguments are never
+coerced. Primitive numbers that are not positive safe integers throw
+`RangeError`: zero (including `-0`), negatives, fractions, `NaN`, infinities, and
+unsafe integers are invalid. `Number.MAX_SAFE_INTEGER` is valid for either or
+both numeric arguments. Only the selected range is allocated, without padding
+to `pageSize` or calculating an oversized page offset:
+
+```js
+const max = Number.MAX_SAFE_INTEGER;
+paginate([1, 2], 1, max).items;   // [1, 2] (a fresh copy)
+paginate([1, 2], max, max).items; // [] (hasPrevious: true, hasNext: false)
+paginate([], max, max).items;     // [] (both navigation flags false)
+```
+
 ## Numeric clamp
 
 Import the named `clamp(value, min, max)` export from `lib/clamp.mjs`:
@@ -125,3 +185,47 @@ Non-string inputs are outside this function's contract.
 
 Normalization is opt-in for callers; `countLines` and `parseCsv` retain their
 existing newline rules.
+
+## HTML text escaping
+
+Import the named `escapeHtml(text)` function to serialize ordinary HTML text
+content:
+
+```js
+import { escapeHtml } from './lib/escape-html.mjs';
+
+const markup = '<p>' + escapeHtml('Tom & <Ada>') + '</p>';
+// '<p>Tom &amp; &lt;Ada&gt;</p>'
+
+escapeHtml(`&<>"'`); // '&amp;&lt;&gt;&quot;&#39;'
+escapeHtml('&amp;'); // '&amp;amp;'
+escapeHtml('');      // ''
+```
+
+Every `&`, `<`, `>`, `"` and `'` is replaced with `&amp;`, `&lt;`, `&gt;`,
+`&quot;` and `&#39;`, respectively. Existing entities are ordinary input: their
+ampersands are escaped again, so repeated escaping is intentionally not
+idempotent.
+
+Only primitive strings are accepted. Non-string values, including boxed strings
+and omitted arguments, throw `TypeError` without coercion. The returned string
+preserves every other code unit, including Unicode, lone surrogates, whitespace,
+line endings, BOM and NUL; empty input returns an empty string. This preservation
+describes the JavaScript string result, not a browser parse/render round trip.
+
+Use this helper for ordinary HTML text serialization. It is not an HTML sanitizer
+or an encoder for JavaScript, CSS or URLs.
+
+## Query string parsing
+
+Import `parseQueryString` from `./lib/parse-query-string.mjs` to parse query text
+into a null-prototype object of string arrays, preserving repeated values in
+order. See the [parsing and error contract](docs/parse-query-string.md) for
+strict percent decoding, literal-key behavior, and examples.
+
+## TTL cache
+
+Import `createTtlCache` from `./lib/ttl-cache.mjs` for an in-memory cache with
+explicit expiry and deterministic least-recently-used eviction. See the
+[TTL cache examples and error contract](docs/ttl-cache.md) for clock injection,
+snapshot behavior, and configuration. The existing `LruCache` API is unchanged.
