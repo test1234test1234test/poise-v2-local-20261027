@@ -243,3 +243,10 @@ Import `createTtlCache` from `./lib/ttl-cache.mjs` for an in-memory cache with
 explicit expiry and deterministic least-recently-used eviction. See the
 [TTL cache examples and error contract](docs/ttl-cache.md) for clock injection,
 snapshot behavior, and configuration. The existing `LruCache` API is unchanged.
+
+## Event journal
+
+Import `createEventJournal` and `restoreEventJournal` from `./lib/event-journal.mjs`
+for atomic JSON event batches, sequence checks, retry receipts and validated
+replay. See the [event journal API and export schema](docs/event-journal.md) for
+JSON normalization, reducer isolation, pagination and failure behavior.
