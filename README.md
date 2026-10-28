@@ -152,6 +152,14 @@ ordinary content. Non-string inputs are outside this function's contract.
 
 Run all tests with `node --test` (or `npm test`).
 
+## First occurrences by key
+
+Import `uniqueBy` from `lib/unique-by.mjs` to keep the first item for each key in
+original order. It returns a new ordinary array, preserves element references,
+uses Map/Set key equality, and skips sparse holes and inherited indexed values.
+See [the contract and examples](docs/unique-by.md) for validation, traversal, and
+callback side-effect behavior.
+
 ## Newline normalization
 
 Import the named `normalizeNewlines(text)` function from `lib/normalize-newlines.mjs`:
