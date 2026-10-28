@@ -188,3 +188,10 @@ Import `parseQueryString` from `./lib/parse-query-string.mjs` to parse query tex
 into a null-prototype object of string arrays, preserving repeated values in
 order. See the [parsing and error contract](docs/parse-query-string.md) for
 strict percent decoding, literal-key behavior, and examples.
+
+## TTL cache
+
+Import `createTtlCache` from `./lib/ttl-cache.mjs` for an in-memory cache with
+explicit expiry and deterministic least-recently-used eviction. See the
+[TTL cache examples and error contract](docs/ttl-cache.md) for clock injection,
+snapshot behavior, and configuration. The existing `LruCache` API is unchanged.
