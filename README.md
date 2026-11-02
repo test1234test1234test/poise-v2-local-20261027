@@ -510,6 +510,13 @@ into a null-prototype object of string arrays, preserving repeated values in
 order. See the [parsing and error contract](docs/parse-query-string.md) for
 strict percent decoding, literal-key behavior, and examples.
 
+## Escaped dot path parsing
+
+Import `parseDotPath` from `./lib/parse-dot-path.mjs` to split escaped dot paths
+into fresh arrays of literal string segments. See the
+[grammar and error contract](docs/parse-dot-path.md) for the two supported
+escapes, exact forbidden names, input preservation and examples.
+
 ## TTL cache
 
 Import `createTtlCache` from `./lib/ttl-cache.mjs` for an in-memory cache with
