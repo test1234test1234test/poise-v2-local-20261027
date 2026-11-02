@@ -698,3 +698,25 @@ source's arbitrary finalization code. After termination or failure, further
 `next()`/`return()` calls do not touch sources. Reentrant calls into the same merge
 while it is executing throw `TypeError`. Manual consumers must call `return()`
 when abandoning a merge; merely stopping calls to `next()` cannot signal cleanup.
+
+## Lazy ordered union
+
+```js
+import { orderedUnion } from './lib/ordered-union.mjs';
+
+[...orderedUnion([3, 1, 3], new Set([2, 1]), [4])]; // [3, 1, 2, 4]
+[...orderedUnion('a😀a', '😀b')];                  // ['a', '😀', 'b']
+```
+
+`orderedUnion(...sources)` is a synchronous generator that yields first
+occurrences in source and iteration order, using SameValueZero equality. It
+preserves original values and object identity, including the sign of a first
+`-0`. Construction touches no source; each source is opened and validated only
+after its predecessor finishes. An infinite source can starve later sources,
+and the membership Set grows with the number of unique values yielded.
+
+Early return, consumer throw, or source protocol failure attempts cleanup of
+only the active iterator. Original errors take precedence over cleanup errors;
+an ordinary return propagates a cleanup error. Manual consumers must call
+`return()` when abandoning iteration. See [ordered union usage and cleanup
+semantics](docs/ordered-union.md) for validation, protocol details, and examples.
