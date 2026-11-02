@@ -152,6 +152,22 @@ ordinary content. Non-string inputs are outside this function's contract.
 
 Run all tests with `node --test` (or `npm test`).
 
+## Substring counter
+
+```js
+import { countSubstring } from './lib/count-substring.mjs';
+
+countSubstring('aaaaa', 'aa'); // 2 (non-overlapping matches)
+countSubstring('', 'a');      // 0
+countSubstring('a.b.', '.');   // 2 (literal matching)
+```
+
+`countSubstring(text, needle)` counts literal, case-sensitive, non-overlapping
+matches over JavaScript UTF-16 code units, including lone surrogates. It does not
+interpret regular expressions or normalize Unicode. Both arguments must be
+primitive strings; otherwise it throws `TypeError` without coercion. After type
+validation, an empty needle throws `RangeError`, even when the text is empty.
+
 ## First occurrences by key
 
 Import `uniqueBy` from `lib/unique-by.mjs` to keep the first item for each key in
