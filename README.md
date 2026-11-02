@@ -161,6 +161,48 @@ Array subclasses, and arrays from other realms are accepted; input iterators,
 methods, constructors, and species are unused. The helper performs no writes to
 the input, even on failure; side effects of caller getters/proxies are not undone.
 
+## Closed interval merging
+
+```js
+import { mergeIntervals } from './lib/merge-intervals.mjs';
+
+const intervals = [[5, 7], [1, 3], [3, 5], [9, 9]];
+mergeIntervals(intervals); // [[1, 7], [9, 9]]
+intervals; // [[5, 7], [1, 3], [3, 5], [9, 9]] (unchanged)
+mergeIntervals([]); // [] (a fresh array)
+```
+
+`mergeIntervals(intervals)` merges closed intervals: overlaps and shared endpoints
+coalesce, while every positive gap keeps intervals separate, however small.
+Single-point intervals are valid. The result is a fresh dense ordinary Array of
+fresh ordinary `[start, end]` pairs, sorted numerically by start and then end.
+No result pair aliases an input pair, another result pair, or another call's pairs.
+Every result endpoint equal to zero is normalized to `+0`; input `-0`s are preserved.
+
+The input must be a dense Array of dense two-element Arrays. Endpoints must be
+finite primitive numbers with `start <= end`. Malformed inputs, holes, invalid
+endpoints, and reversed bounds throw `TypeError` without coercion. Every outer
+index and both pair indices must be own properties; inherited indices cannot
+fill holes and their getters are not read. Non-enumerable own indices are valid,
+and unrelated named/symbol properties are ignored.
+
+The helper captures the initial outer length, visits own outer slots once in index
+order, and reads each encountered pair's length, start and end once for that
+occurrence. Ownership is checked before each indexed read. Repeated references
+are separate occurrences; changes made by getters to later slots are observed,
+while outer appends beyond the captured length are ignored. Only captured,
+validated numbers are used for sorting and merging, after full validation.
+
+Frozen arrays, Array subclasses, cross-realm Arrays, and null-prototype Arrays are
+accepted at either level. Input iterators, methods, constructors and
+`Symbol.species` are not read. Proxies that forward Array length and own-index
+checks normally are supported; arbitrary virtualization of those checks is
+outside this contract. Caller-thrown accessor/proxy exceptions propagate unchanged.
+The helper performs no writes, deletes, freezing or prototype changes to inputs
+on success or failure; caller getter/proxy side effects cannot be undone.
+Validation/copying and merging are linear; sorting gives `O(n log n)` total time
+with `O(n)` additional space.
+
 ## Line counter
 
 Import the named `countLines(text)` function from `lib/count-lines.mjs`:
