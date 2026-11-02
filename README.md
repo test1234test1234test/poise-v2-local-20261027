@@ -363,6 +363,61 @@ uses Map/Set key equality, and skips sparse holes and inherited indexed values.
 See [the contract and examples](docs/unique-by.md) for validation, traversal, and
 callback side-effect behavior.
 
+## Stable partition
+
+```js
+import { partitionStable } from './lib/partition-stable.mjs';
+
+partitionStable([1, 2, 3, 4, 5], value => value % 2 === 0);
+// [[2, 4], [1, 3, 5]]
+
+const values = [, 'A', undefined, , 'B'];
+partitionStable(values, (_value, index, original) => {
+  // original === values; called only at indices 1, 2, 4
+  return index % 2 === 0;
+});
+// [[undefined, 'B'], ['A']] (undefined is an own slot; holes are skipped)
+```
+
+`partitionStable(values, predicate)` returns `[matching, remaining]`, preserving
+each visited value and its relative order within its group, including repeated
+references. The predicate is called exactly once per present **own** array index,
+in ascending order, with exactly `(value, originalIndex, originalArray)`. Holes
+and inherited numeric properties are skipped without reading them; explicit
+`undefined` and non-enumerable own indices are visited. Named, symbol and other
+non-index properties are ignored.
+
+Classification uses synchronous JavaScript truthiness: truthy results go to
+`matching`, falsy results to `remaining`, without coercing objects or requiring
+Booleans. Results are not awaited: a returned Promise is a truthy object, even
+if it resolves to `false`, as is `new Boolean(false)`.
+
+Both arguments are required: `values` must be an Array and `predicate` a function.
+Other inputs throw `TypeError` without coercion, before any indexed reads or
+callback calls, even for empty and all-hole arrays. Array subclasses, arrays and
+functions from other realms, and null-prototype arrays are accepted. Every call
+returns a fresh ordinary array pair containing two distinct, fresh, dense ordinary
+arrays, including empty groups. Input iterators, constructors and `Symbol.species`
+hooks are not accessed. Output slots are own data properties even when inherited
+numeric accessors or non-writable properties exist on `Array.prototype`.
+
+Traversal captures the initial length after validation, then checks own presence
+and reads each present value once immediately before its predicate. Callback or
+getter changes to future slots within that bound are observed: filled holes and
+replacements are visited; deleted slots are skipped even if an inherited value
+is exposed. Shortening the input removes later slots; appends beyond the initial
+length are ignored. Replacing or deleting the current slot inside its predicate
+does not change the captured value placed in the result. Traversal work is
+proportional to initial array length, including holes.
+
+The helper never writes to or freezes the input or its elements; frozen inputs
+are supported. Copying is shallow: object and nested-array identities are retained.
+Changing a result's slots or length cannot change the source or sibling group;
+mutating a shared element remains visible through every reference to it. If a
+predicate or indexed getter throws, the exact thrown value propagates immediately,
+with no later reads, callback calls or partial return. Caller side effects are not
+rolled back. Nested and subsequent invocations have independent result state.
+
 ## Newline normalization
 
 Import the named `normalizeNewlines(text)` function from `lib/normalize-newlines.mjs`:
