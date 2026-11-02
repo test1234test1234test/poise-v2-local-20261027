@@ -366,6 +366,55 @@ explicit expiry and deterministic least-recently-used eviction. See the
 [TTL cache examples and error contract](docs/ttl-cache.md) for clock injection,
 snapshot behavior, and configuration. The existing `LruCache` API is unchanged.
 
+## Bounded FIFO ring buffer
+
+```js
+import { createRingBuffer } from './lib/ring-buffer.mjs';
+
+const buffer = createRingBuffer(2);
+const item = { id: 1 };
+buffer.shift();         // { found: false }
+buffer.push(undefined); // { evicted: false }
+buffer.push(item);      // { evicted: false }; buffer.size is now 2
+buffer.push('next');    // { evicted: true, value: undefined }
+buffer.toArray();       // [item, 'next']; fresh array, same item reference
+buffer.shift();         // { found: true, value: item }
+buffer.clear();         // undefined
+buffer.size;            // 0; capacity remains 2
+buffer.shift();         // { found: false }
+```
+
+`createRingBuffer(capacity)` requires a positive safe-integer number. Every
+invalid capacity throws `TypeError`, without coercion; there is no default.
+Large capacities, including `2 ** 32` and `Number.MAX_SAFE_INTEGER`, are valid
+without allocating their capacity up front. The read-only `size` getter reports
+the current number of entries. A push into a full buffer evicts exactly the
+oldest entry and leaves size unchanged; the push that first fills it does not
+evict. Empty shifts leave the buffer unchanged.
+
+Every JavaScript value is accepted, including `undefined`, without inspecting or
+copying payloads. Repeated references remain separate FIFO entries. Each `push`
+and `shift` returns a fresh status object; false results have no `value` property,
+while successful removals include it even for `undefined`. Editing a result
+wrapper cannot change the buffer or other results, and later operations do not
+rewrite earlier results. Payload references remain shared.
+
+`toArray()` returns a fresh dense ordinary Array in FIFO order, including when
+empty. Editing its slots cannot change the buffer or another snapshot, and later
+buffer operations do not change previous snapshots. Mutations to shared payload
+objects remain visible through all references. At a theoretical size above the
+Array length limit (`2 ** 32 - 1`), `toArray()` throws `RangeError` without changing
+the buffer. `clear()` releases the buffer's references, resets size, preserves
+capacity, and returns `undefined`; clearing an empty buffer is safe.
+
+The linked FIFO performs a bounded number of structural operations on every
+`push` and `shift` (worst-case `O(1)`, excluding runtime allocation and garbage
+collection). Buffer-owned storage is `O(1 + size)`, excluding caller-owned
+payload internals and returned results/snapshots. Removed nodes are not pooled;
+draining or clearing releases both endpoints without mutating payloads or
+promising immediate garbage collection. Snapshot work and output storage are
+`O(size)`, independent of capacity.
+
 ## Event journal
 
 Import `createEventJournal` and `restoreEventJournal` from `./lib/event-journal.mjs`
