@@ -373,6 +373,28 @@ for atomic JSON event batches, sequence checks, retry receipts and validated
 replay. See the [event journal API and export schema](docs/event-journal.md) for
 JSON normalization, reducer isolation, pagination and failure behavior.
 
+## Deterministic JSON serialization
+
+```js
+import { stableStringify } from './lib/stable-stringify.mjs';
+
+stableStringify({ b: { d: 4, c: 3 }, a: [2, 1] });
+// '{"a":[2,1],"b":{"c":3,"d":4}}'
+stableStringify({ '2': 2, '10': 10 });
+// '{"10":10,"2":2}'
+```
+
+`stableStringify(value)` emits compact JSON with object keys sorted by raw UTF-16
+code units and array order preserved. It accepts null, primitive booleans and
+strings, finite primitive numbers, dense Arrays and plain/null-prototype objects.
+Unsupported values, accessors, holes and cycles throw `TypeError`; shared acyclic
+references are serialized at each occurrence. It never invokes input getters,
+constructors or `toJSON`, and does not modify the input.
+
+The contract deliberately differs from native JSON's omission and null-conversion
+rules. See the [serialization contract](docs/stable-stringify.md) for ignored
+properties, array metadata, proxy and built-in boundaries, escaping and limits.
+
 ## Lazy sorted merge
 
 ```js
