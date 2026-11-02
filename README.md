@@ -293,6 +293,31 @@ units are accepted, including BOM, NUL, combining marks and noncharacters.
 The input is preserved without repair, normalization, trimming or escape
 decoding. This check is opt-in; existing string helpers retain their contracts.
 
+## UTF-8 text chunking
+
+```js
+import { chunkUtf8 } from './lib/chunk-utf8.mjs';
+
+chunkUtf8('aé€😀b', 5); // ['aé', '€', '😀b']
+chunkUtf8('e\u0301', 2); // ['e', '\u0301']
+chunkUtf8('', 1);       // []
+```
+
+`chunkUtf8(text, maxBytes)` returns a fresh ordinary Array of nonempty strings,
+each at most `maxBytes` UTF-8 bytes. Each chunk is the longest consecutive prefix
+that fits without splitting a Unicode code point. Joining the chunks reproduces
+the original text exactly, including BOM, NUL and combining marks; no
+normalization or grapheme-cluster grouping occurs. Empty text returns a fresh
+empty array.
+
+Both arguments are required, even for empty text: `text` must be a primitive
+string and `maxBytes` a positive safe-integer Number. Invalid arguments throw
+`TypeError` without coercion. After argument validation, any unpaired UTF-16
+surrogate throws `TypeError`; only for well-formed text does a code point larger
+than the limit throw `RangeError`. Failures return no partial result. Work is
+linear in the input length, with allocation based on the actual text and chunks,
+not on the limit; `Number.MAX_SAFE_INTEGER` is accepted.
+
 ## Asynchronous semaphore
 
 Import `AsyncSemaphore` from `lib/async-semaphore.mjs` for fair, cancellable
