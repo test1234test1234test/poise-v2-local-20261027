@@ -224,6 +224,30 @@ describes the JavaScript string result, not a browser parse/render round trip.
 Use this helper for ordinary HTML text serialization. It is not an HTML sanitizer
 or an encoder for JavaScript, CSS or URLs.
 
+## Unicode well-formedness
+
+Import the named `isWellFormedUnicode(text)` function to check UTF-16 surrogate
+pairing:
+
+```js
+import { isWellFormedUnicode } from './lib/well-formed-unicode.mjs';
+
+isWellFormedUnicode('');                 // true
+isWellFormedUnicode('A😀e\u0301');        // true
+isWellFormedUnicode('\uFEFF');           // true
+isWellFormedUnicode('\uD800');           // false
+isWellFormedUnicode('\uD800x\uDC00');    // false
+isWellFormedUnicode(new String(''));     // throws TypeError
+```
+
+Only primitive strings are accepted; all other inputs, including boxed strings
+and omitted arguments, throw `TypeError` without coercion. The result is a
+Boolean: empty text is valid, and every high surrogate must be immediately
+followed by a low surrogate, with no unpaired low surrogates. All other code
+units are accepted, including BOM, NUL, combining marks and noncharacters.
+The input is preserved without repair, normalization, trimming or escape
+decoding. This check is opt-in; existing string helpers retain their contracts.
+
 ## Asynchronous semaphore
 
 Import `AsyncSemaphore` from `lib/async-semaphore.mjs` for fair, cancellable
