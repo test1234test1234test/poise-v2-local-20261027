@@ -132,6 +132,35 @@ subnormal numbers, and the full finite number range are supported.
 
 Run the regression tests with `node --test` (also available as `npm test`).
 
+## Finite-number median
+
+```js
+import { median } from './lib/median.mjs';
+
+const values = [4, 1, 3, 2];
+median(values);    // 2.5
+values;            // [4, 1, 3, 2] (unchanged)
+median([10, 2, 3]); // 3
+median([]);        // null
+```
+
+`median(values)` accepts an Array of finite primitive numbers. Other inputs,
+invalid elements, and holes throw `TypeError` without coercion. Every index must
+be an own property; inherited values cannot fill holes. Non-enumerable indices
+are accepted, and unrelated named/symbol properties are ignored.
+
+The odd-length result is the middle value in numeric order; the even-length
+result is the mean of the two middle values, avoiding overflow and using binary64
+round-to-nearest, ties-to-even. Equal values, including signed zeros, retain their
+input order. Odd results preserve the selected zero's sign; even results follow
+Number arithmetic (two `-0` values yield `-0`, mixed zeros yield `+0`).
+
+The helper snapshots the initial length and reads each own index once in order,
+validating and sorting the captured values in separate storage. Frozen arrays,
+Array subclasses, and arrays from other realms are accepted; input iterators,
+methods, constructors, and species are unused. The helper performs no writes to
+the input, even on failure; side effects of caller getters/proxies are not undone.
+
 ## Line counter
 
 Import the named `countLines(text)` function from `lib/count-lines.mjs`:
