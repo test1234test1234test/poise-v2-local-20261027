@@ -754,6 +754,38 @@ source's arbitrary finalization code. After termination or failure, further
 while it is executing throw `TypeError`. Manual consumers must call `return()`
 when abandoning a merge; merely stopping calls to `next()` cannot signal cleanup.
 
+## Eager ordered union
+
+```js
+import { unionOrdered } from './lib/union-ordered.mjs';
+
+unionOrdered([3, 1, 3], new Set([2, 1]), 'ab'); // [3, 1, 2, 'a', 'b']
+unionOrdered('a😀a', '😀b');                  // ['a', '😀', 'b']
+unionOrdered();                              // []
+```
+
+`unionOrdered(...iterables)` returns a fresh ordinary array of first occurrences,
+visiting each source to completion from left to right during the call. Inputs
+must be finite synchronous iterables, such as arrays, strings, Sets, generators,
+or custom iterables. Finiteness is a caller precondition. Later sources are not
+accessed or validated before earlier sources finish, including duplicate tails.
+
+Membership uses SameValueZero equality: repeated `NaN` values appear once and
+`+0`/`-0` share a key. The first value itself is retained, including its zero sign:
+`Object.is(unionOrdered([-0], [+0])[0], -0)` is `true`. Results are shallow;
+objects and nested arrays retain their identities, and distinct objects remain
+distinct. Values are not coerced, flattened, or awaited. The helper does not
+modify source containers or elements. Consuming a stateful iterator advances it,
+and caller-supplied hooks can have their own side effects.
+
+Invalid non-iterables (including explicit `undefined`) and malformed iterator
+protocols throw `TypeError` synchronously. Traversal follows native synchronous
+`for...of` semantics: errors obtaining an iterator, obtaining/calling `next`, or
+reading its result propagate without closing that source. If processing an
+obtained value throws, normal IteratorClose attempts the active iterator's
+`return()` and preserves the original error even if cleanup fails. Exhausted
+sources are never closed, and later sources are untouched after a failure.
+
 ## Lazy ordered union
 
 ```js
