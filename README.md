@@ -263,6 +263,39 @@ interpret regular expressions or normalize Unicode. Both arguments must be
 primitive strings; otherwise it throws `TypeError` without coercion. After type
 validation, an empty needle throws `RangeError`, even when the text is empty.
 
+## Natural string comparison
+
+```js
+import { compareNatural } from './lib/compare-natural.mjs';
+
+compareNatural('file2', 'file10'); // -1
+compareNatural('file2', 'file02'); // -1
+compareNatural('x0', 'x00');      // -1
+compareNatural('a/', 'a9');       // -1
+
+['file10', 'file02', 'file2z', 'file2'].sort(compareNatural);
+// ['file2', 'file2z', 'file02', 'file10']
+```
+
+`compareNatural(a, b)` returns exactly `-1`, positive `0`, or `1`. Both arguments
+must be primitive strings; missing arguments, boxed strings, and other types
+throw `TypeError` without coercion, even when paired with an empty string.
+
+Comparison proceeds from left to right. When both current characters are ASCII
+digits (`0`–`9`), their complete, maximal digit runs are compared as arbitrary-length
+nonnegative integers without conversion to `Number`. Numeric magnitude comes
+first (`'0009' < '10'`); equal values are tied immediately by shorter original
+run length, before considering suffixes (`'file2z' < 'file02a'`). Equal runs
+advance to the next character.
+
+Otherwise, the current Unicode code points are compared by numeric value, even
+when only one is an ASCII digit. Equal code points advance together; exhaustion
+sorts first. Valid surrogate pairs form one code point, and lone surrogates retain
+their numeric values, so `compareNatural('\uD800', '\uE000') === -1`.
+Comparison is case-sensitive and uses no locale, trimming, normalization, or
+grapheme grouping. Signs, punctuation, whitespace, and non-ASCII digits remain
+literal text. Zero is returned only for identical strings.
+
 ## Unicode longest common prefix
 
 ```js
