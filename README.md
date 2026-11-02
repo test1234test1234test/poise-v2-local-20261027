@@ -427,6 +427,27 @@ describes the JavaScript string result, not a browser parse/render round trip.
 Use this helper for ordinary HTML text serialization. It is not an HTML sanitizer
 or an encoder for JavaScript, CSS or URLs.
 
+## Atomic text edits
+
+```js
+import { applyTextEdits } from './lib/apply-text-edits.mjs';
+
+applyTextEdits('abcd', [
+  { start: 1, end: 3, text: 'X' },
+  { start: 3, end: 3, text: '!' },
+]); // 'aX!d'
+```
+
+`applyTextEdits(text, edits)` validates a complete batch before returning a
+primitive string, without modifying inputs or invoking their getters. All
+coordinates are UTF-16 code-unit offsets into the original text. Replacements
+may touch but cannot overlap; insertions at a shared boundary retain input order
+between the replacements. Malformed inputs throw `TypeError`; invalid numeric
+ranges and conflicts throw `RangeError`.
+
+See the [text edit contract](docs/apply-text-edits.md) for exact object/array
+schemas, proxy rejection, boundary ordering, Unicode behavior and examples.
+
 ## Unicode well-formedness
 
 Import the named `isWellFormedUnicode(text)` function to check UTF-16 surrogate
