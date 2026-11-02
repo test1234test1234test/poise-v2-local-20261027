@@ -263,6 +263,37 @@ interpret regular expressions or normalize Unicode. Both arguments must be
 primitive strings; otherwise it throws `TypeError` without coercion. After type
 validation, an empty needle throws `RangeError`, even when the text is empty.
 
+## Unicode longest common prefix
+
+```js
+import { longestCommonPrefix } from './lib/longest-common-prefix.mjs';
+
+longestCommonPrefix(['flower', 'flow', 'flight']); // 'fl'
+longestCommonPrefix(['😀x', '😀y']);              // '😀'
+longestCommonPrefix(['😀', '😁']);                // ''
+longestCommonPrefix([]);                         // ''
+```
+
+`longestCommonPrefix(strings)` returns a primitive string containing the longest
+common prefix measured in Unicode code points. An empty array returns `''`; a
+singleton returns its string unchanged. Empty strings are valid. Comparison is
+case-sensitive and preserves the original spelling without normalization or
+grapheme grouping, so `['e\u0301', 'e\u0300']` has prefix `'e'`.
+
+Surrogates follow JavaScript string-iterator semantics: a valid surrogate pair
+is one comparison element; an unmatched surrogate is preserved as an individual
+element. The result never splits a pair in any input. Thus `['\uD800x', '\uD800y']`
+returns `'\uD800'`, but `['\uD83D', '😀']` returns `''`.
+
+The argument must be an Array with a primitive string at every own index.
+Non-Arrays, boxed strings, other nonstring elements, and sparse arrays (even
+with inherited indexed values) throw `TypeError` without coercion. All indexed
+values are validated before returning, even when the prefix is empty. The
+initial length is captured and each indexed value is read once; unrelated
+properties, custom iterators, and constructor/species hooks are ignored.
+The helper does not write to or freeze the input, on success or failure, and
+accepts frozen arrays. Side effects of caller-provided getters are not undone.
+
 ## Unicode edit distance
 
 ```js
