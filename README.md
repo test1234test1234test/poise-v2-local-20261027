@@ -444,6 +444,23 @@ The contract deliberately differs from native JSON's omission and null-conversio
 rules. See the [serialization contract](docs/stable-stringify.md) for ignored
 properties, array metadata, proxy and built-in boundaries, escaping and limits.
 
+## Byte size parsing
+
+```js
+import { parseByteSize } from './lib/parse-byte-size.mjs';
+
+parseByteSize('1.5 KiB');             // 1536
+parseByteSize('1.001kB');             // 1001
+parseByteSize('9007199254740.991kB'); // 9007199254740991
+```
+
+`parseByteSize(text)` converts a decimal quantity with an optional case-sensitive
+`B`, `kB`, `MB`, `GB`, `KiB`, `MiB` or `GiB` unit into an exact safe integer byte
+count. A missing unit means bytes. ASCII whitespace may surround the quantity
+or separate its number and unit. Nonstring inputs and malformed syntax throw
+`TypeError`; fractional bytes and values above `Number.MAX_SAFE_INTEGER` throw
+`RangeError`. See the [grammar, multipliers and error contract](docs/parse-byte-size.md).
+
 ## Lazy sorted merge
 
 ```js
