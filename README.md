@@ -197,6 +197,34 @@ interpret regular expressions or normalize Unicode. Both arguments must be
 primitive strings; otherwise it throws `TypeError` without coercion. After type
 validation, an empty needle throws `RangeError`, even when the text is empty.
 
+## Unicode edit distance
+
+```js
+import { levenshteinDistance } from './lib/levenshtein.mjs';
+
+levenshteinDistance('kitten', 'sitting'); // 3
+levenshteinDistance('😀', '');            // 1 (one Unicode code point)
+levenshteinDistance('é', 'e\u0301');      // 2 (no normalization)
+```
+
+`levenshteinDistance(left, right)` returns the minimum total cost of inserting,
+deleting or substituting Unicode code points, each with cost one. The result is a
+nonnegative integer. Comparison is case-sensitive; text is not normalized or
+grouped into grapheme clusters, and inputs are not mutated. Empty strings are
+valid: two empty strings have distance zero, and the distance from empty text is
+the other string's code-point length. Transposition is not a unit-cost edit.
+
+Both arguments must be primitive, well-formed Unicode strings. Other values
+(including omitted arguments and boxed strings) and unpaired UTF-16 surrogates
+throw `TypeError`. Validation precedes equality and empty-input results, without
+coercion, reading properties of nonstrings, or repairing malformed text.
+
+For code-point lengths `m` and `n`, total work is `O(1 + m + n + m*n)`, including
+linear validation and traversal when an input is empty. Auxiliary space is
+`O(1 + min(m,n))`: only the side with fewer UTF-16 code units is buffered (at most
+twice the smaller code-point length), with one distance row. The other input is
+streamed; no full matrix or second code-point buffer is retained.
+
 ## First occurrences by key
 
 Import `uniqueBy` from `lib/unique-by.mjs` to keep the first item for each key in
