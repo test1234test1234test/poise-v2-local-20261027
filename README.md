@@ -132,6 +132,30 @@ subnormal numbers, and the full finite number range are supported.
 
 Run the regression tests with `node --test` (also available as `npm test`).
 
+## Safe integer power of two
+
+```js
+import { isPowerOfTwo } from './lib/is-power-of-two.mjs';
+
+isPowerOfTwo(1);             // true
+isPowerOfTwo(2 ** 32);       // true
+isPowerOfTwo(2 ** 32 + 1);   // false
+isPowerOfTwo(2 ** 52);       // true (largest accepted power)
+isPowerOfTwo(2 ** 53);       // false (unsafe integer)
+isPowerOfTwo('2');           // false (no coercion)
+```
+
+`isPowerOfTwo(value)` returns a primitive Boolean: `true` exactly for primitive
+JavaScript Number values equal to `2 ** exponent`, for integer exponents from 0
+through 52. Only positive safe integers can qualify; `2 ** 52` is the largest
+accepted power. The check preserves all significant bits above the 32-bit range.
+
+Every other input returns `false` without coercion or exceptions, including zero,
+negative numbers, fractions, `NaN`, infinities, unsafe integers, strings, boxed
+Numbers, BigInts, Symbols, objects, and omitted inputs. Object conversion hooks
+are never accessed or called. The function checks the Number it receives, so
+`2 ** 52 + 0.5`, which JavaScript rounds to `2 ** 52` before the call, is accepted.
+
 ## Finite-number median
 
 ```js
