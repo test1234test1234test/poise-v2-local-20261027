@@ -290,3 +290,83 @@ Import `createEventJournal` and `restoreEventJournal` from `./lib/event-journal.
 for atomic JSON event batches, sequence checks, retry receipts and validated
 replay. See the [event journal API and export schema](docs/event-journal.md) for
 JSON normalization, reducer isolation, pagination and failure behavior.
+
+## Lazy sorted merge
+
+```js
+import { mergeSorted } from './lib/merge-sorted.mjs';
+
+const ascending = (a, b) => a - b;
+[...mergeSorted([[1, 3, 3], [2, 3, 4]], ascending)];
+// [1, 2, 3, 3, 3, 4]
+
+function* evens() {
+  for (let value = 0; ; value += 2) yield value;
+}
+const prefix = [];
+for (const value of mergeSorted([evens(), [1, 3, 5]], ascending)) {
+  prefix.push(value);
+  if (prefix.length === 5) break; // Closes the live source iterators.
+}
+// prefix is [0, 1, 2, 3, 4]
+```
+
+`mergeSorted(sources, compare)` returns a synchronous iterable iterator with
+`next()`, `return()` and `[Symbol.iterator]()` returning itself. Each source must
+already be sorted in the consistent order defined by `compare`; descending
+orders work too. Input sortedness is not checked. Do not change ordering keys
+while their elements are buffered. Elements retain their identities, and neither
+the source containers nor their elements are copied, sorted or modified.
+Each source's order is preserved. Equal elements from different sources use
+ascending original source index, including across duplicate runs. An infinite
+run of equal values in an earlier source therefore starves equal values in later
+sources; this ordering does not promise fairness.
+
+The outer input must be an Array and `compare` must be a function. These checks
+run at the function call, even for `[]`. Each comparison receives two elements
+and must return a finite primitive number, interpreted only by sign. Other
+results throw `TypeError` without coercion; comparator exceptions propagate.
+Comparisons are unnecessary with fewer than two live sources. The restriction
+on comparison results does not restrict payload types: `undefined`, infinities,
+objects and Promises can all be elements with an appropriate comparator.
+
+Construction opens and advances nothing. The first `next()` captures the outer
+Array's length, then opens sources in index order using live indexed reads
+(including inherited indices); the outer Array's iterator is ignored. Changes
+before that call are visible, and appends during opening are beyond the captured
+length. An absent slot reads as `undefined` and fails source validation when
+opened. Each source must have a synchronous iterator factory that returns an
+object with a callable `next`; async-only sources are rejected. Returned iterator
+objects need not themselves be iterable. Different entries must return distinct
+iterator objects: shared iterators throw `TypeError` during opening, with normal
+failure cleanup of the already opened live set. Repeating an Array source works
+because each opening creates an independent iterator.
+
+A successful first pull obtains one result from every source. Later pulls refill
+only the previous winner, after its buffered value has been delivered. Returning
+after a yield does not pull again; returning before the first `next()` opens and
+closes nothing. The merger captures each iterator's `next` method once and calls
+it with that iterator as receiver. Each result's `done` is read first, and a
+non-exhausted result's `value` is read once and buffered by reference, so reused
+result objects work. Startup takes `O(k)` work for `k` sources; subsequent
+selection takes `O(log(max(2, liveSources)))` work per output. Auxiliary storage
+is `O(k)` with at most one buffered value per live source and no output history.
+
+On early consumer return, source failure or comparison failure, cleanup attempts
+one synchronous `return()` per opened, unexhausted iterator in source index
+order. Ownership starts as soon as an iterator object is obtained, before reading
+its `next` property. Observing truthy `done` marks exhaustion: no further `next`,
+`value` or cleanup access is made for that exhausted result/iterator. Never-opened
+iterators are also left alone. Cleanup looks up the current `return` hook and
+calls it with its iterator as receiver. Missing/null hooks are skipped;
+non-callable hooks and primitive cleanup results are `TypeError`s. Cleanup does
+not inspect result properties or retry a result with `done: false`.
+
+Every eligible cleanup is attempted even when earlier hooks throw. An original
+traversal/comparison error retains priority; on normal early return, the first
+cleanup error propagates after the remaining attempts. A `for...of` body throw
+also retains its original error. Cleanup does not guarantee completion of a
+source's arbitrary finalization code. After termination or failure, further
+`next()`/`return()` calls do not touch sources. Reentrant calls into the same merge
+while it is executing throw `TypeError`. Manual consumers must call `return()`
+when abandoning a merge; merely stopping calls to `next()` cannot signal cleanup.
