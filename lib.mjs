@@ -6,6 +6,11 @@ export function isAsciiToken(value) {
   return typeof value === 'string' && /^[A-Za-z0-9!#$%&'*+.^_`|~-]+$/.test(value);
 }
 
+/** Return whether value is a nonempty primitive string of ASCII hexadecimal digits. */
+export function isAsciiHex(value) {
+  return typeof value === 'string' && /^[0-9A-Fa-f]+$/.test(value);
+}
+
 /** Return whether value is a nonempty primitive string containing only U+0021–U+007E. */
 export function isVisibleAscii(value) {
   return typeof value === 'string' && value.length > 0 && !/[^\x21-\x7e]/.test(value);
