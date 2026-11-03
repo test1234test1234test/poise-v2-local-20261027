@@ -104,6 +104,51 @@ its original identity even if cleanup fails. Failed groups are discarded.
 Once natural exhaustion is observed, neither `next()` nor `return()` is called
 on the source again.
 
+## One-time asynchronous invocation
+
+```js
+import { onceAsync } from './lib/once-async.mjs';
+
+const load = onceAsync(async function (key) {
+  return { key, source: this.name };
+});
+const source = { name: 'first', load };
+const first = source.load('alpha');
+const second = load.call({ name: 'second' }, 'beta');
+first === second;       // true: one shared promise
+await first;            // { key: 'alpha', source: 'first' }
+load('gamma') === first; // true, even after settlement
+```
+
+`onceAsync(fn)` throws `TypeError` synchronously for a non-function, including
+omitted or explicit `undefined` input. Constructing a valid wrapper does not
+invoke `fn`. The first wrapper call queues its invocation in a microtask and
+returns before `fn` starts. A microtask queued before that call runs before
+`fn`; one queued immediately after the call runs after `fn` starts. Settlement
+can take further microtasks when adopting promises or thenables.
+
+The callback runs once with the first call's receiver and arguments, including
+an empty argument list. References are retained without copying or freezing
+their contents; bound and arrow functions keep their normal receiver semantics.
+Every call returns the exact same native promise, whether invocation is queued,
+running, fulfilled or rejected. Separate wrappers have independent caches.
+
+The shared promise uses native resolution to adopt the callback's result,
+including promises and thenables; it need not be the callback's returned
+promise. Ordinary fulfillment objects retain their identity. Synchronous throws
+and throwing `then` getters reject the shared promise with the exact thrown
+value. Rejection reasons, including `undefined`, promises and thenables, remain
+opaque. Both fulfillment and rejection are permanent: retrying requires a new
+wrapper. A consumer's `.then` transformation or `.catch` recovery affects only
+its derived promise.
+
+Reentrant calls from `fn` or a result's `then` getter/method see the shared
+promise. Returning an independent value allows normal settlement; directly
+returning the shared promise rejects with a cached native `TypeError`. Throwing
+that promise instead preserves it as the rejection reason. Indirect circular
+waits, such as an async callback awaiting the shared promise, can stay pending;
+there is no general cycle detection. There is no reset API, timer or global cache.
+
 ## Asynchronous trailing-edge debounce
 
 ```js
