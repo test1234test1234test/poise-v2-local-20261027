@@ -734,6 +734,90 @@ Import `AsyncSemaphore` from `lib/async-semaphore.mjs` for fair, cancellable
 permits that bound concurrent work. Acquire before the work and release in
 `finally`; see [usage and the ownership contract](docs/async-semaphore.md).
 
+## Bounded asynchronous channel
+
+```js
+import { createAsyncChannel } from './lib/async-channel.mjs';
+
+const channel = createAsyncChannel(2);
+const job = { id: 1 };
+await channel.send(undefined); // Accepted data, distinct from end-of-channel.
+await channel.send(job);       // Accepted by reference; no consumer is needed yet.
+channel.close();               // true; preserves both accepted values.
+
+while (true) {
+  const { value, done } = await channel.receive();
+  if (done) break;
+  console.log(value);          // undefined, then the original job object.
+}
+channel.close();               // false
+```
+
+`createAsyncChannel(capacity)` creates an independent in-memory FIFO for Node.js
+22. Capacity must be a positive safe-integer Number; every invalid capacity
+throws `TypeError`, without coercion. Even `Number.MAX_SAFE_INTEGER` is allowed
+without allocating storage up front. The getter-only `size` counts buffered,
+accepted values, and `closed` starts false and becomes permanently true on close.
+
+`send(value, options)` returns a Promise fulfilling with `undefined` when the
+value is accepted into the buffer or delivered directly to a waiting receiver.
+Acceptance does not acknowledge completion of consumer processing. A full
+buffer makes the send wait **without accepting its value**. `receive(options)`
+returns a Promise for `{ value, done: false }` when it removes a value. Every
+JavaScript value is data, including `undefined`, Promises and thenables; payloads
+are never cloned, awaited or inspected. Each direction preserves its own FIFO
+order among surviving queued operations; newcomers cannot bypass them.
+
+Available acceptance, delivery, removal, queued refill and listener cleanup
+commit **synchronously before the triggering method returns**. Promise reactions
+run later. For example, with A buffered and B blocked at capacity one,
+`const a = channel.receive(); channel.close()` removes A and accepts B before
+closing, so B can still drain. Closing before that receive instead rejects B.
+Once an operation commits, later abort or close cannot revoke its result.
+
+Options may be omitted or `undefined`; otherwise they must be a non-null,
+non-array object, including class instances and null-prototype objects.
+`options.signal` is read once, including inherited getters. Missing or
+`undefined` means no signal, and unrelated keys are ignored. Signals must be
+native AbortSignals with this realm's `AbortSignal.prototype`, including
+controller signals, `AbortSignal.abort()` and `AbortSignal.any()`. Proxies,
+inherited-signal wrappers, prototype-only imitations and duck types are rejected;
+modifying native signal internals or platform prototypes is unsupported.
+Invalid arguments reject the returned Promise with `TypeError`, without a
+synchronous throw or channel mutation. A throwing signal getter rejects with
+its exact thrown value; any side effects performed by that getter remain.
+Channel state is checked after reading the getter, so reentrant operations take
+effect before the outer call.
+
+Validation comes first, then pre-abort, then closure and normal operation.
+A pre-aborted signal rejects with its exact `signal.reason`, even after close,
+without accepting or consuming data. Aborting a queued operation unlinks only
+that operation and preserves survivor order. Abort state is checked again at
+handoff and close, so an earlier caller abort listener cannot accidentally
+deliver or accept canceled work. Owned abort listeners are removed on every
+settlement without removing caller or other operations' listeners. Node's
+`addAbortListener` prevents `stopImmediatePropagation()` from suppressing
+cancellation. A synthetic abort event on a live signal does not cancel work;
+its one-shot subscription is re-armed in a microtask that also checks for a real
+abort during the gap. Settled records cannot be re-armed.
+
+`close()` is synchronous: it returns `true` on the first call and `false`
+thereafter, without waiting for consumers. It rejects all unaccepted queued
+sends and all future valid, nonaborted sends with an `Error` whose `code` is
+`CHANNEL_CLOSED`. Already-aborted queued operations keep their abort reason.
+Accepted values remain available in order; once drained, every pending or future
+valid, nonaborted receive resolves to `{ value: undefined, done: true }`.
+Closing an empty channel releases all waiting receivers immediately.
+
+When sending more than capacity, run consumers concurrently and await sends for
+backpressure. With multiple producers, close only after all intended producers
+finish. Capacity bounds buffered entries, not outstanding send calls, payload
+byte size or work already removed by consumers. Storage follows live buffered
+values and pending operations; drained values and settled records are released
+from channel-owned state. Callers may still retain values or result Promises.
+The channel adds no dependencies, timers, background polling or async-iterator
+interface.
+
 ## Keyed serial executor
 
 ```js
