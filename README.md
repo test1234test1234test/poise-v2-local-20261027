@@ -574,6 +574,102 @@ Import `AsyncSemaphore` from `lib/async-semaphore.mjs` for fair, cancellable
 permits that bound concurrent work. Acquire before the work and release in
 `finally`; see [usage and the ownership contract](docs/async-semaphore.md).
 
+## Keyed serial executor
+
+```js
+import { createKeyedSerialExecutor } from './lib/keyed-serial-executor.mjs';
+
+const executor = createKeyedSerialExecutor();
+const controller = new AbortController();
+const work = [
+  executor.run('account-a', async () => {
+    // Capture a signal if the running operation should also cooperate in abort.
+    controller.signal.throwIfAborted();
+    await saveAccount('account-a');
+    return await refreshAccount('account-a');
+  }, { signal: controller.signal }),
+  executor.run('account-a', () => saveAccount('account-a')), // waits for both steps
+  executor.run('account-b', () => saveAccount('account-b')), // may overlap account-a
+];
+
+await Promise.allSettled(work);
+await executor.close();
+```
+
+`createKeyedSerialExecutor()` returns an independent executor for Node.js 22.
+`run(key, fn, options)` always returns a Promise. Jobs sharing a key start in
+successful admission order, with at most one running until its entire returned
+result settles. Different keys may run concurrently. Keys use Map/SameValueZero
+identity without coercion: `NaN` shares a lane with `NaN`, `+0` with `-0`, while
+`1`, `'1'`, and `1n` differ. Objects, functions and symbols use identity.
+
+Callbacks are invoked as `fn()` with zero arguments and no supplied receiver.
+Invocation happens asynchronously, after `run()` returns. The returned promise
+adopts the actual callback result, including nested thenables, synchronous
+throws and rejected promises; a rejection never blocks the next job. Return or
+await **all** work that needs serialization, as in the two-step example above.
+A direct return of the job's own public promise rejects with native `TypeError`.
+
+`pending` and `closed` are getter-only properties, initially `0` and `false`.
+An accepted, unstarted job counts as pending even on an idle key. Callback entry
+is the transition to running: the job leaves pending and its abort subscription
+is removed before caller code executes. Reading pending scans queued work,
+excluding signals already aborted even inside an earlier external abort listener
+or during the synthetic-event re-arm gap described below.
+
+Validation precedes the closed check, which precedes pre-abort and admission.
+`fn` must be a function. Omitted or explicit `undefined` options mean `{}`;
+otherwise options must be a non-null, non-array object. `options.signal` is read
+once, including inherited getters. Missing or `undefined` signal means none;
+unrelated option keys are ignored. Null-prototype option objects are accepted.
+Signals must be native AbortSignals with this realm's `AbortSignal.prototype`:
+controller signals, `AbortSignal.abort()` and `AbortSignal.any()` are supported.
+Proxies, inherited-signal wrappers, prototype-only imitations, duck types and
+foreign-prototype signals are rejected. This uses a native receiver check plus
+prototype/proxy checks, not `instanceof` alone; modifying native signal internals
+or platform prototypes is outside the supported boundary.
+
+Invalid arguments reject with `TypeError`; a throwing signal getter rejects with
+its exact thrown value. Failed validation does not admit work or install a
+listener, even after close. Getters can still perform their own side effects:
+a nested submission is admitted first, and a getter that closes the executor
+causes the outer valid call to receive the closed error. A getter that closes
+and then throws retains its thrown value.
+
+A pre-aborted signal rejects with its exact reason without invoking the callback.
+Aborting queued work unlinks only that job and preserves survivor order. Both
+`run(); controller.abort()` and `run(); close()` in the same synchronous turn can
+prevent an idle-key callback from starting. After callback entry, scheduler
+cancellation cannot change the job's outcome or free its key early. Running work
+must cooperate using its own captured signal if it wants to stop.
+
+Owned listeners are removed on start, cancellation and close without removing
+external listeners. Node's built-in `addAbortListener` prevents another listener's
+`stopImmediatePropagation()` from suppressing cancellation. A synthetic
+`signal.dispatchEvent(new Event('abort'))` does not cancel work. Its consumed
+one-shot subscription is re-armed in a microtask that also checks for a real
+abort in the gap; start and close check current signal state too. Removed queue
+records release their callbacks, signals and promise references, including while
+a predecessor remains blocked; drained keys are deleted. The executor adds no
+dependency, timers, persistent workers or background polling.
+
+`close()` synchronously sets `closed` permanently to true, clears queued work
+and listeners, and makes pending zero. Queued jobs reject with one retained
+`Error` whose `code` is `'EXECUTOR_CLOSED'`. If an abort is already dispatching
+when an earlier external listener calls close, jobs with that aborted signal
+retain their abort reason; close followed by abort retains the closed error.
+Every later valid run rejects with the same closed error, even with a pre-aborted
+signal. Invalid calls still receive their validation error.
+
+Close returns the **same Promise on every call**, including idle close and calls
+after drainage. It fulfills with `undefined` only after every running result
+settles, even if some reject, without retaining their results. Running job
+promises preserve their own outcomes. A job may initiate close and store its
+promise for awaiting outside the job, but must finish independently: returning
+or awaiting that close promise creates a dependency cycle. Awaiting a new job
+queued behind oneself on the same key also creates a cycle. A running result
+that never settles keeps close pending.
+
 ## CSV parsing
 
 ```js
