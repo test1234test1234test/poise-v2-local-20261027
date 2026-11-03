@@ -6,6 +6,11 @@ export function isAsciiToken(value) {
   return typeof value === 'string' && /^[A-Za-z0-9!#$%&'*+.^_`|~-]+$/.test(value);
 }
 
+/** Return whether value is a nonempty primitive string containing only U+0021–U+007E. */
+export function isVisibleAscii(value) {
+  return typeof value === 'string' && value.length > 0 && !/[^\x21-\x7e]/.test(value);
+}
+
 /** Compare primitive bigints in signed mathematical order, returning Number -1, 0, or 1. */
 export function compareBigInts(a, b) {
   if (typeof a !== 'bigint' || typeof b !== 'bigint') {
