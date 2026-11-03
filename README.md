@@ -556,6 +556,35 @@ Any other type or omitted operand throws `TypeError` synchronously, even if
 both invalid operands are identical. There is no coercion or unboxing, and
 rejected values' conversion properties and methods are never accessed or called.
 
+## Canonical unsigned decimal bigint parsing
+
+```js
+import { parseCanonicalUnsignedBigInt } from './lib.mjs';
+
+parseCanonicalUnsignedBigInt('0');                // 0n
+parseCanonicalUnsignedBigInt('101');              // 101n
+parseCanonicalUnsignedBigInt('9007199254740993'); // 9007199254740993n
+
+parseCanonicalUnsignedBigInt('01');            // throws SyntaxError
+parseCanonicalUnsignedBigInt('1n');            // throws SyntaxError
+parseCanonicalUnsignedBigInt(1n);              // throws TypeError
+parseCanonicalUnsignedBigInt(new String('1')); // throws TypeError
+```
+
+`parseCanonicalUnsignedBigInt(text)` accepts only a primitive string whose entire
+contents are `0`, or an ASCII digit `1`–`9` followed by zero or more ASCII digits
+`0`–`9`. It returns the exact primitive bigint without conversion through Number,
+a Number safe-integer restriction, fixed-width truncation, or an imposed digit cap.
+
+Malformed strings throw `SyntaxError` synchronously. Empty strings, whitespace
+anywhere, signs, leading zeroes, separators, decimal points, exponents, radix
+prefixes, non-ASCII digits and trailing characters are rejected. Input text has
+no bigint-literal `n` suffix. There is no trimming or Unicode normalization.
+
+Omitted input and all non-primitive-string values, including boxed strings, throw
+`TypeError` synchronously. Rejection occurs without accessing or calling input
+conversion properties or methods.
+
 ## Natural string comparison
 
 ```js

@@ -8,3 +8,15 @@ export function compareBigInts(a, b) {
 
   return a < b ? -1 : a > b ? 1 : 0;
 }
+
+/** Parse a primitive string containing a canonical unsigned ASCII decimal integer exactly. */
+export function parseCanonicalUnsignedBigInt(text) {
+  if (typeof text !== 'string') {
+    throw new TypeError('text must be a primitive string');
+  }
+  if (!/^(?:0|[1-9][0-9]*)$/.test(text)) {
+    throw new SyntaxError('text must be a canonical unsigned decimal integer');
+  }
+
+  return BigInt(text);
+}
