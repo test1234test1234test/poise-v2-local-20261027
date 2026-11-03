@@ -104,6 +104,76 @@ its original identity even if cleanup fails. Failed groups are discarded.
 Once natural exhaustion is observed, neither `next()` nor `return()` is called
 on the source again.
 
+## Asynchronous trailing-edge debounce
+
+```js
+import { debounceAsync } from './lib/debounce-async.mjs';
+
+const doubled = debounceAsync(async value => value * 2, 25);
+const first = doubled(1);
+const second = doubled(3); // Joins the waiting batch and restarts its timer.
+doubled.pending;           // true
+const flushed = doubled.flush(); // Starts the callback synchronously.
+doubled.pending;           // false, even if the callback is still running
+await Promise.all([first, second, flushed]); // [6, 6, 6]
+await doubled.flush();     // undefined: there is no waiting batch
+```
+
+`debounceAsync(fn, delayMs)` returns a fresh callable with getter-only boolean
+`pending`, synchronous `cancel(reason)`, and promise-returning `flush()` controls.
+`fn` must be a function and `delayMs` must be a primitive number; otherwise
+construction throws `TypeError`. Numeric delays must be finite, nonnegative
+safe integers no greater than `2_147_483_647`, or construction throws `RangeError`.
+Both `0` and `-0` are valid and still defer invocation to a timer. There is no
+default delay and no input coercion.
+
+Each call returns the waiting batch's shared promise. Calls before invocation
+restart the trailing timer and replace the saved arguments and `this` receiver
+with those of the latest call, including a plain call with no arguments. Timer
+expiry invokes `fn` exactly once. All callers in that batch receive the same
+value or exact rejection reason; synchronous throws become rejections. The
+shared promise adopts returned promises and thenables through native promise
+resolution once, without separately assimilating the result for each caller.
+
+`pending` is true only while a batch is waiting on its timer. The batch detaches
+and `pending` becomes false **before** `fn` starts or its result is assimilated.
+Calls during an older invocation, including recursive calls from `fn` or a
+thenable, create a new independently timed batch. Invocations may overlap and
+finish in either order; an older success or failure cannot alter a newer batch.
+A callback can return a recursively created batch's promise and await its
+result. Directly returning its own batch's promise rejects with native
+`TypeError`; arbitrary indirect cycles are not detected, and callback results
+that never settle may remain pending.
+
+`flush()` cancels the waiting timer and starts that batch immediately, before
+returning its shared promise. It uses the same invocation and settlement path as
+timer expiry. With no waiting batch it returns an already-fulfilled promise with
+`undefined`, even while older invocations are running. Repeated flushes never
+repeat an invocation, but can start a new batch queued recursively by a previous
+invocation.
+
+`cancel(reason)` synchronously clears and detaches only the waiting batch,
+rejects its promise with the exact supplied reason, and returns `undefined`.
+With no argument, it creates one new `Error` named `AbortError` for that batch;
+explicit `undefined` remains an `undefined` rejection reason. Objects, promises
+and thenable reasons are preserved without coercion or assimilation. Idle or
+repeated cancellation is harmless, running invocations are unaffected, and new
+calls are accepted immediately.
+
+Handle returned rejected promises, including cancellation. For example, attach
+a handler before intentionally canceling:
+
+```js
+const observed = doubled(5).catch(reason => reason);
+doubled.cancel();
+(await observed).name; // 'AbortError'
+```
+
+The callable owns at most one waiting timer and has no worker, interval or
+background loop. Superseded, expired, flushed and canceled timers are cleared;
+obsolete arguments and receivers are released. There is no per-caller waiter
+array or retained running-batch history.
+
 ## Array pagination
 
 ```js
