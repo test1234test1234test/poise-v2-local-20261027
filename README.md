@@ -741,6 +741,14 @@ with a bounded attempt count, optional decision hook, delay and AbortSignal.
 Cancellation drains an active callback before rejecting. Retry only work the
 caller can safely repeat; see the [API and ownership contract](docs/retry-async.md).
 
+## Combine abort signals
+
+Import `combineAbortSignals` from `lib/combine-abort-signals.mjs` to combine an
+array of native signals into a fresh `{ signal, dispose }` result. The first
+source abort supplies the exact reason; `dispose()` releases subscriptions and,
+when called before an abort, leaves the output un-aborted. See the
+[ordering, lifecycle and error contract](docs/combine-abort-signals.md).
+
 ## Bounded asynchronous channel
 
 ```js
