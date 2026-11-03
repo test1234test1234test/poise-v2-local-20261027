@@ -519,6 +519,34 @@ ranges and conflicts throw `RangeError`.
 See the [text edit contract](docs/apply-text-edits.md) for exact object/array
 schemas, proxy rejection, boundary ordering, Unicode behavior and examples.
 
+## ASCII text recognition
+
+Import the named `isAscii(text)` function to check whether text is entirely ASCII:
+
+```js
+import { isAscii } from './lib/is-ascii.mjs';
+
+isAscii('Hello, world!');          // true
+isAscii('');                      // true
+isAscii('\0\t\n\r\x7f');          // true (NUL, controls and DEL)
+isAscii('café');                  // false
+isAscii('e\u0301');               // false
+isAscii('😀');                    // false
+isAscii('\uD800');                // false (lone surrogate)
+isAscii(new String('ASCII'));     // throws TypeError
+isAscii();                        // throws TypeError
+```
+
+The result is a Boolean: `true` exactly when every UTF-16 code unit is in the
+inclusive range U+0000–U+007F. Empty text, NUL, all ASCII controls and DEL are
+ASCII. Any code unit above U+007F returns `false`, including accented letters,
+combining marks, astral characters and lone surrogates. The original text is
+checked without trimming, normalization, escape decoding or lossy encoding.
+
+Only primitive strings are accepted. All other inputs, including boxed strings,
+omitted arguments and explicit `undefined`, throw `TypeError` without coercion
+or reading properties on the rejected value.
+
 ## Unicode well-formedness
 
 Import the named `isWellFormedUnicode(text)` function to check UTF-16 surrogate
