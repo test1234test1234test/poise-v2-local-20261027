@@ -907,6 +907,40 @@ The entire original string is checked without trimming, normalization, quote
 removal or escape/percent decoding. There is no length cap or additional
 restriction for a particular header or authentication scheme.
 
+## ASCII hexadecimal validation
+
+```js
+import { isAsciiHex } from './lib.mjs';
+
+isAsciiHex('aBcDeF0123456789'); // true (mixed case)
+isAsciiHex('0');                // true
+isAsciiHex('00');               // true (leading zeroes)
+isAsciiHex('abc');              // true (odd length)
+isAsciiHex('0b10');             // true (b is a hexadecimal digit)
+isAsciiHex('1e3');              // true (e is a hexadecimal digit)
+isAsciiHex('0x10');             // false
+isAsciiHex('+f');               // false
+isAsciiHex('f\n');              // false
+isAsciiHex('Ｆ');               // false (non-ASCII)
+isAsciiHex('');                 // false
+isAsciiHex(new String('f'));    // false
+isAsciiHex(15);                 // false (no coercion)
+isAsciiHex();                   // false
+```
+
+`isAsciiHex(value)` returns Boolean `true` exactly for a nonempty primitive
+string composed entirely of ASCII `0`–`9`, `A`–`F`, or `a`–`f`. Every other
+value returns Boolean `false`, including boxed strings, omitted arguments,
+empty strings, signs, whitespace, controls and non-ASCII characters. Non-string
+inputs are rejected without coercion or property access.
+
+Validation checks the entire original string without trimming, normalization,
+escape/percent decoding or numeric interpretation. `0x`/`0X` and `0o`/`0O`
+forms fail because `x`, `X`, `o` and `O` are outside the alphabet. Strings such
+as `0b10`, `0B10`, `0b`, `1e3` and `1E3` pass because all their characters are
+hexadecimal digits. Leading zeroes, mixed case and odd lengths are allowed;
+there is no numeric magnitude, byte-range or fixed-width restriction.
+
 ## Unicode well-formedness
 
 Import the named `isWellFormedUnicode(text)` function to check UTF-16 surrogate

@@ -6,6 +6,11 @@ export function isAsciiToken(value) {
   return typeof value === 'string' && /^[A-Za-z0-9!#$%&'*+.^_`|~-]+$/.test(value);
 }
 
+/** Return whether value is a nonempty primitive string of ASCII hexadecimal digits. */
+export function isAsciiHex(value) {
+  return typeof value === 'string' && /^[0-9A-Fa-f]+$/.test(value);
+}
+
 /** Compare primitive bigints in signed mathematical order, returning Number -1, 0, or 1. */
 export function compareBigInts(a, b) {
   if (typeof a !== 'bigint' || typeof b !== 'bigint') {
