@@ -1,5 +1,10 @@
 # Bounded asynchronous mapping
 
+This module retains the options-based API and its default concurrency of four.
+For the public `mapConcurrent(items, limit, mapper, { signal } = {})` entry point
+in `lib.mjs`, see the [README](../README.md#bounded-asynchronous-mapping). Both
+use the same scheduler and failure/cancellation behavior.
+
 ```js
 import { mapConcurrent } from '../lib/map-concurrent.mjs';
 
@@ -21,23 +26,25 @@ Results always follow input order, regardless of completion order.
 The helper never writes to the input array or its element objects. Results use
 a fresh array; input values and mapped results keep their original references.
 This does not prevent a caller-supplied mapper from mutating its own inputs.
-The initial input length fixes the traversal bound. Each value is read when
-its index starts, using ordinary indexed access. Sparse holes are visited as
+The initial input length fixes the traversal bound. An item starts at mapper
+invocation; each value is read just before that invocation using ordinary
+indexed access. If the read throws, the operation fails and drains active work.
+If it aborts the signal, that mapper is not invoked. Sparse holes are visited as
 `undefined` unless an inherited indexed property supplies a value. Appended
 items beyond the initial length are not visited; changes to unstarted indices
 are visible. The input iterator is not used.
 
 ## Failure and cancellation
 
-The first observed mapper failure or abort event owns the outcome. Observation
-means the order of synchronous throws, promise rejection callbacks, and abort
-events in JavaScript, independent of error timestamps or input indices. For
-example, rejecting a mapper promise and immediately calling `controller.abort()`
+The first observed mapper failure or actual cancellation owns the outcome.
+Observation means the order of synchronous throws, promise rejection callbacks,
+and abort notifications in JavaScript, independent of error timestamps or input
+indices. For example, rejecting a mapper promise and immediately calling `controller.abort()`
 in the same synchronous turn observes the abort event before the queued promise
 rejection callback. The exact winning rejection value is preserved, including
 `undefined`, `null`, and other falsy values.
 
-Once stopped, the helper starts no more indices. It observes every started
+Once stopped, the helper invokes no more mappers. It observes every started
 mapper's settlement, consumes later rejections, and rejects only after all
 started calls have settled. Successful late completions cannot restart mapping.
 A synchronous mapper throw stops the current launch loop immediately. Neither
@@ -52,6 +59,14 @@ from a timeout-based signal. There is no helper timeout or process termination.
 Every listener installed by a call is removed when it settles, leaving caller
 listeners and other invocations' listeners intact. Empty or already-aborted
 calls install no listeners.
+
+Cancellation requires `signal.aborted === true`; dispatching a synthetic
+`abort` event alone does not cancel work. Native abort notifications are
+protected against other listeners calling `stopImmediatePropagation()`.
+The scheduler also checks abort state before launching, after reading an input
+value, and before processing settlements, so cancellation cannot be lost during
+the re-arming of a listener after a synthetic event. A previously observed
+failure still retains its reason when cancellation arrives later.
 
 ## Validation and boundary conventions
 

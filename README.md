@@ -47,6 +47,57 @@ infinities, and unsafe integers. `Number.MAX_SAFE_INTEGER` is valid; an oversize
 size copies only the available elements, without padding or allocating to that
 size.
 
+## Bounded asynchronous mapping
+
+```js
+import { mapConcurrent } from './lib.mjs';
+
+const controller = new AbortController();
+const results = await mapConcurrent([3, 1, 2], 2, async (item, index, signal) => {
+  signal.throwIfAborted();
+  return { index, doubled: item * 2 };
+}, { signal: controller.signal });
+// [{ index: 0, doubled: 6 }, { index: 1, doubled: 2 }, { index: 2, doubled: 4 }]
+```
+
+`mapConcurrent(items, limit, mapper, { signal } = {})` returns a Promise for a
+fresh array in input order, regardless of completion order. It invokes
+`mapper(item, index, signal)` in ascending index order with at most `limit`
+outstanding mapper promises, refilling slots as work settles. The mapper may
+return a plain value, promise or thenable, or throw synchronously. Input and
+result objects retain their identities; the helper does not mutate the input.
+The supplied signal is passed unchanged, or as `undefined` when omitted.
+
+Arguments are validated before any mapper runs, even for empty input. `items`
+must be an Array and `mapper` a function. `limit` is required: a non-number
+(including omitted/`undefined` or boxed numbers) rejects with `TypeError`;
+zero, negative, fractional, nonfinite or unsafe numbers reject with `RangeError`.
+`Number.MAX_SAFE_INTEGER` is valid without allocating that many workers.
+Validation errors reject the returned Promise. After validation, a pre-aborted
+signal rejects with its exact reason and starts no work, **even for `[]`**.
+Otherwise empty input resolves to a fresh empty array.
+
+The first observed failure or cancellation stops further mapper invocations.
+Every already-started mapper is awaited before rejection, and later rejections
+are consumed. The exact first reason is preserved, including falsy values.
+Observation follows synchronous throws, rejection callbacks and actual abort
+notifications: rejecting a mapper promise and immediately aborting in the same
+turn observes cancellation before the queued rejection callback. Aborting does
+not interrupt a mapper that ignores its signal; a never-settling mapper keeps
+the operation pending. No partial results are returned on failure.
+
+An item starts at mapper invocation. Values are read just before invocation;
+if an input getter aborts, that mapper is skipped. Only actual cancellation
+(`signal.aborted === true`) counts; synthetic `abort` events are ignored.
+Native aborts remain observable even if another listener suppresses event
+propagation. Calls remove only their own listeners when settled and never
+abort the caller's controller.
+
+The [legacy options-based API](docs/map-concurrent.md) remains available from
+`./lib/map-concurrent.mjs` with its default concurrency of four. Both entry
+points share the scheduler, array traversal rules and AbortSignal-like input
+support documented there; the root API always requires an explicit limit.
+
 ## Lazy async batching
 
 ```js
