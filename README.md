@@ -873,6 +873,40 @@ Only primitive strings are accepted. All other inputs, including boxed strings,
 omitted arguments and explicit `undefined`, throw `TypeError` without coercion
 or reading properties on the rejected value.
 
+## ASCII token validation
+
+```js
+import { isAsciiToken } from './lib.mjs';
+
+isAsciiToken('Content-Type');      // true
+isAsciiToken("!#$%&'*+-.^_`|~");   // true (punctuation-only token)
+isAsciiToken('a%2Fb');             // true (literal text, no percent decoding)
+isAsciiToken('');                  // false
+isAsciiToken('two words');         // false
+isAsciiToken('token\n');           // false
+isAsciiToken('a/b');               // false
+isAsciiToken('café');              // false
+isAsciiToken(new String('token')); // false
+isAsciiToken(null);                // false (no coercion)
+isAsciiToken('null');              // true
+isAsciiToken();                    // false
+```
+
+`isAsciiToken(value)` returns Boolean `true` exactly for nonempty primitive
+strings composed entirely of ASCII letters (`A`–`Z`, `a`–`z`), digits (`0`–`9`),
+and these HTTP token punctuation characters:
+
+```text
+! # $ % & ' * + - . ^ _ ` | ~
+```
+
+Every other value returns `false`, including boxed strings, empty strings,
+whitespace, separators, controls, DEL, non-ASCII letters, emoji and lone
+surrogates. Non-string inputs are rejected without coercion or property access.
+The entire original string is checked without trimming, normalization, quote
+removal or escape/percent decoding. There is no length cap or additional
+restriction for a particular header or authentication scheme.
+
 ## Unicode well-formedness
 
 Import the named `isWellFormedUnicode(text)` function to check UTF-16 surrogate
