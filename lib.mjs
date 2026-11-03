@@ -1,4 +1,5 @@
 export const baseline = () => 'sandbox';
+export { collectAsync } from './lib/collect-async.mjs';
 
 /** Compare primitive bigints in signed mathematical order, returning Number -1, 0, or 1. */
 export function compareBigInts(a, b) {
