@@ -1085,14 +1085,25 @@ test('strict rejection oracle rejects a deliberately observer-free fixture', () 
   assert.match(result.stderr, /observer-free fixture/);
 });
 
-for (const failure of ['read', 'cleanup', 'both', 'shadowed async read', 'shadowed sync value']) {
-  test(`strict rejection oracle: late ${failure} errors are observed by the collector`, () => {
+for (const [failure, shadow] of [
+  ['read'], ['cleanup'], ['both'],
+  ['shadowed async read', 'undefined'], ['shadowed sync value', 'undefined'],
+  ['shadowed async read', 'throwing getter'], ['shadowed sync value', 'throwing getter'],
+]) {
+  test(`strict rejection oracle: late ${failure} errors are observed${shadow ? ` (${shadow} then)` : ''}`, () => {
     const result = strictProbe(`
       import assert from 'node:assert/strict';
       import { getEventListeners } from 'node:events';
       import { collectAsync } from ${JSON.stringify(new URL('../lib.mjs', import.meta.url).href)};
       const read = Promise.withResolvers(), cleanup = Promise.withResolvers();
-      ${failure.startsWith('shadowed') ? 'read.promise.then = cleanup.promise.then = undefined;' : ''}
+      let thenGets = 0;
+      ${shadow ? `
+        for (const promise of [read.promise, cleanup.promise]) {
+          Object.defineProperty(promise, 'then', ${shadow === 'undefined' ? '{ value: undefined }' : `{
+            get() { thenGets++; throw new Error('native promise then must not be read'); },
+          }`});
+        }
+      ` : ''}
       const controller = new AbortController(), reason = {};
       let reads = 0, closes = 0, settled = false;
       const result = collectAsync({
@@ -1111,12 +1122,14 @@ for (const failure of ['read', 'cleanup', 'both', 'shadowed async read', 'shadow
       await new Promise(resolve => setImmediate(resolve));
       assert.equal(settled, true);
       assert.equal(closes, 1);
+      assert.equal(thenGets, 0);
       ${failure !== 'cleanup' ? "read.reject(new Error('late read'));" : 'read.resolve({ value: 1 });'}
       await new Promise(resolve => setImmediate(resolve));
       ${failure !== 'read' ? "cleanup.reject(new Error('late cleanup'));" : 'cleanup.resolve({ done: true });'}
       await new Promise(resolve => setImmediate(resolve));
       assert.equal(reads, 1);
       assert.equal(closes, 1);
+      assert.equal(thenGets, 0);
       assert.equal(getEventListeners(controller.signal, 'abort').length, 0);
       await observed;
     `);
