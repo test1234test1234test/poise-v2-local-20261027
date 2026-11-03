@@ -279,6 +279,35 @@ interpret regular expressions or normalize Unicode. Both arguments must be
 primitive strings; otherwise it throws `TypeError` without coercion. After type
 validation, an empty needle throws `RangeError`, even when the text is empty.
 
+## Split at the first separator
+
+```js
+import { splitOnce } from './lib/split-once.mjs';
+
+splitOnce('a:b:c', ':');  // ['a', 'b:c']
+splitOnce(':abc', ':');   // ['', 'abc']
+splitOnce('abc:', ':');   // ['abc', '']
+splitOnce('abc', ':');    // ['abc', null]
+splitOnce('', ':');       // ['', null]
+splitOnce('ababa', 'aba'); // ['', 'ba'] (consume the first complete occurrence)
+```
+
+The named `splitOnce(text, separator)` function returns a fresh two-element array
+on every call. At the first match it returns `[before, after]`, excluding that
+one separator and preserving empty parts and the entire suffix immediately after
+it, including later complete occurrences. If the separator is absent, it returns
+`[text, null]`; this differs from a trailing match, whose second part is `''`.
+
+Both arguments must be primitive strings. Missing arguments, boxed strings and
+other types throw `TypeError` without coercion. Both types are validated before
+an empty separator throws `RangeError`, even when the text is empty:
+`splitOnce(null, '')` throws `TypeError`, and `splitOnce('', '')` throws `RangeError`.
+
+Matching is literal and case-sensitive, using JavaScript UTF-16 positions and
+the separator's UTF-16 length, without regular expressions or Unicode
+normalization. Astral characters and lone surrogates remain literal data. A split
+may cut inside a surrogate pair: `splitOnce('😀', '\uD83D')` returns `['', '\uDE00']`.
+
 ## Natural string comparison
 
 ```js
