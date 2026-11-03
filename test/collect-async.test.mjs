@@ -695,13 +695,23 @@ for (const where of ['async factory getter', 'sync factory getter', 'factory', '
   });
 }
 
-test('a truthy done returned by an aborting getter establishes exhaustion', async () => {
-  const controller = new AbortController(), reason = {};
-  await rejected(observe(collectAsync(iterable(Symbol.iterator, {
-    next() { return { get done() { controller.abort(reason); return true; } }; },
-    get return() { assert.fail('observed exhaustion must not close'); },
-  }), { signal: controller.signal })), reason);
-});
+for (const protocol of protocols) {
+  test(`${label(protocol)} truthy done returned by an aborting getter establishes exhaustion`, async () => {
+    const controller = new AbortController(), reason = {};
+    let reads = 0, closeGets = 0;
+    await rejected(observe(collectAsync(iterable(protocol, {
+      next() {
+        reads++;
+        return { get done() { controller.abort(reason); return true; } };
+      },
+      get return() { closeGets++; assert.fail('observed exhaustion must not close'); },
+    }), { signal: controller.signal })), reason);
+    // The committed abort reason can mask an assertion thrown by return's getter.
+    assert.equal(closeGets, 0, 'observed exhaustion must not access return');
+    assert.equal(reads, 1);
+    assert.equal(listeners(controller.signal), 0);
+  });
+}
 
 test('async next aborts before returning a later-rejecting promise', async () => {
   const read = deferred(), controller = new AbortController(), reason = {};
