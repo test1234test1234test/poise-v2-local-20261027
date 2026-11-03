@@ -104,6 +104,26 @@ its original identity even if cleanup fails. Failed groups are discarded.
 Once natural exhaustion is observed, neither `next()` nor `return()` is called
 on the source again.
 
+## Cancellation-safe collection
+
+```js
+import { collectAsync } from './lib.mjs';
+
+await collectAsync([1, Promise.resolve(2), 3]); // [1, 2, 3]
+await collectAsync([1, 2, 3], { limit: 2 });    // [1, 2]
+```
+
+`collectAsync(iterable, { limit = Infinity, signal } = {})` collects sync or
+async input in order into a fresh array. Limits are validated before acquisition;
+zero and pre-abort do not touch the iterator. Exact limits never request an extra
+value. Truncation and source failure close once; natural exhaustion does not.
+Normal cleanup is awaited, while abort rejects promptly without waiting for a
+pending read or cleanup, observing their late failures and preventing more reads.
+
+See the [exact collection contract](docs/collect-async.md) for promise-valued
+items, close/error precedence, deterministic cancellation races, native signal
+support, listener lifetime and scheduling limits.
+
 ## One-time asynchronous invocation
 
 ```js
