@@ -132,6 +132,22 @@ subnormal numbers, and the full finite number range are supported.
 
 Run the regression tests with `node --test` (also available as `npm test`).
 
+## Hexadecimal byte formatting
+
+```js
+import { hexByte } from './lib/hex-byte.mjs';
+
+hexByte(10);  // '0a'
+hexByte(255); // 'ff'
+hexByte(-0);  // '00'
+```
+
+`hexByte(value)` returns exactly two lowercase hexadecimal digits for an integer
+primitive number from 0 through 255, inclusive. Negative zero is accepted as zero.
+Non-number inputs, including omitted arguments, strings, BigInts, and boxed
+numbers, throw `TypeError` without coercion. Numbers outside the integer byte
+domain, including fractions, `NaN`, and infinities, throw `RangeError`.
+
 ## Safe integer power of two
 
 ```js
