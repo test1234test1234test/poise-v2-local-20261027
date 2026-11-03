@@ -1,5 +1,6 @@
 export const baseline = () => 'sandbox';
 export { collectAsync } from './lib/collect-async.mjs';
+export { createPriorityQueue } from './lib/priority-queue.mjs';
 
 /** Return whether value is a nonempty primitive string of HTTP token characters. */
 export function isAsciiToken(value) {

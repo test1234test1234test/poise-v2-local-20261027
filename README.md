@@ -1186,6 +1186,28 @@ or awaiting that close promise creates a dependency cycle. Awaiting a new job
 queued behind oneself on the same key also creates a cycle. A running result
 that never settles keeps close pending.
 
+## Asynchronous priority queue
+
+```js
+import { createPriorityQueue } from './lib.mjs';
+
+const queue = createPriorityQueue({ concurrency: 2 });
+const ordinary = queue.submit(signal => fetch('https://example.com/ordinary', { signal }));
+const urgent = queue.submit(signal => fetch('https://example.com/urgent', { signal }), { priority: 10 });
+const closing = queue.close();
+await Promise.allSettled([ordinary, urgent]);
+await closing;
+```
+
+The dependency-free queue dispatches synchronous submissions together at a
+microtask boundary, with higher priority first and FIFO ties. Cancellation
+rejects a job's public promise promptly while its active slot remains occupied
+until the callback actually settles. Close drains accepted work; `onIdle()`
+observes repeatable idle boundaries. The bound limits running work, not queued
+capacity. See the [priority queue documentation](docs/priority-queue.md) for
+validation, signal support, result adoption, races and exact scheduling/idle
+boundaries. The direct module entry point is `lib/priority-queue.mjs`.
+
 ## CSV parsing
 
 ```js
