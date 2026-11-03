@@ -298,6 +298,39 @@ test('sync values assimilate nested thenables, but sync result objects do not', 
   assert.equal(resultThenReads, 0);
 });
 
+for (const protocol of protocols) {
+  for (const shadow of ['undefined', 'throwing getter']) {
+    test(`${label(protocol)} awaits native promises with ${shadow} then`, async () => {
+      for (const fails of [false, true]) {
+        const value = {}, error = {}, controller = new AbortController();
+        const promise = fails ? Promise.reject(error)
+          : Promise.resolve(protocol === Symbol.iterator ? value : { value });
+        Object.defineProperty(promise, 'then', shadow === 'undefined'
+          ? { value: undefined }
+          : { get() { assert.fail('native promise then must not be read'); } });
+        let reads = 0, closes = 0;
+        const state = observe(collectAsync(iterable(protocol, {
+          next() {
+            if (reads++ > 0) return done;
+            return protocol === Symbol.iterator ? { value: promise } : promise;
+          },
+          return() { closes++; return done; },
+        }), { signal: controller.signal }));
+        if (fails) await rejected(state, error);
+        else {
+          await state.done;
+          assert.equal(state.status, 'fulfilled');
+          assert.deepEqual(state.value, [value]);
+          assert.equal(state.value[0], value);
+        }
+        assert.equal(reads, fails ? 1 : 2);
+        assert.equal(closes, fails ? 1 : 0);
+        assert.equal(listeners(controller.signal), 0);
+      }
+    });
+  }
+}
+
 test('sync rejected values close; rejected terminal values never access return', async () => {
   for (const terminal of [false, true]) {
     const error = {}, events = [];
@@ -1052,18 +1085,23 @@ test('strict rejection oracle rejects a deliberately observer-free fixture', () 
   assert.match(result.stderr, /observer-free fixture/);
 });
 
-for (const failure of ['read', 'cleanup', 'both']) {
+for (const failure of ['read', 'cleanup', 'both', 'shadowed async read', 'shadowed sync value']) {
   test(`strict rejection oracle: late ${failure} errors are observed by the collector`, () => {
     const result = strictProbe(`
       import assert from 'node:assert/strict';
       import { getEventListeners } from 'node:events';
       import { collectAsync } from ${JSON.stringify(new URL('../lib.mjs', import.meta.url).href)};
       const read = Promise.withResolvers(), cleanup = Promise.withResolvers();
+      ${failure.startsWith('shadowed') ? 'read.promise.then = cleanup.promise.then = undefined;' : ''}
       const controller = new AbortController(), reason = {};
       let reads = 0, closes = 0, settled = false;
       const result = collectAsync({
-        [Symbol.asyncIterator]() { return this; },
-        next() { return ++reads === 1 ? read.promise : { done: true }; },
+        [${failure === 'shadowed sync value' ? 'Symbol.iterator' : 'Symbol.asyncIterator'}]() { return this; },
+        next() {
+          return ++reads === 1
+            ? ${failure === 'shadowed sync value' ? '{ value: read.promise }' : 'read.promise'}
+            : { done: true };
+        },
         return() { closes++; return cleanup.promise; },
       }, { signal: controller.signal });
       const observed = result.then(() => assert.fail('fulfilled'), error => {

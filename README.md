@@ -546,6 +546,36 @@ the separator's UTF-16 length, without regular expressions or Unicode
 normalization. Astral characters and lone surrogates remain literal data. A split
 may cut inside a surrogate pair: `splitOnce('😀', '\uD83D')` returns `['', '\uDE00']`.
 
+## Exact signed bigint comparison
+
+```js
+import { compareBigInts } from './lib.mjs';
+
+compareBigInts(-10n, -2n); // -1
+compareBigInts(11n, -7n);  // 1
+compareBigInts(5n, 5n);    // 0
+compareBigInts(-0n, 0n);   // 0 (bigint has no distinct negative zero)
+
+const huge = 10n ** 400n;
+compareBigInts(huge, huge + 1n);   // -1
+compareBigInts(-huge - 1n, -huge); // -1
+
+compareBigInts(1n, 1);          // throws TypeError
+compareBigInts(Object(1n), 1n); // throws TypeError
+```
+
+`compareBigInts(a, b)` compares two primitive bigint arguments in signed
+mathematical order. It returns exactly the Number `-1` when `a < b`, positive
+`0` when they are equal, or `1` when `a > b`. Comparisons remain exact for
+arbitrarily large positive and negative bigint values, without converting to
+Number or narrowing to a fixed width. The result can be used with
+`Array.prototype.sort`.
+
+Both operands are validated before comparison, including equality checks.
+Any other type or omitted operand throws `TypeError` synchronously, even if
+both invalid operands are identical. There is no coercion or unboxing, and
+rejected values' conversion properties and methods are never accessed or called.
+
 ## Natural string comparison
 
 ```js

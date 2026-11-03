@@ -80,6 +80,9 @@ means the collector actually observed truthy `done`.
 | Sync | The result of `next()` must itself be an object and is **not** awaited or assimilated, even if thenable. Read `done`, then read and await `value`, including terminal values. Promises and nested thenables are assimilated. Value rejection fails collection. |
 | Async | Await the result of `next()`, then read `done`. For a nonterminal result, preserve `value` verbatim, including a promise or thenable. Do not read terminal `value`. |
 
+Awaiting a native promise whose constructor is `Promise` ignores its own `then`
+property, including an undefined value or throwing getter, just as `await` does.
+
 `done` and any applicable `value` are read once per result. Once a truthy `done`
 getter returns, the source is exhausted, even if that getter aborted the signal.
 A sync terminal value's rejection or later cancellation does not close an
