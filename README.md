@@ -853,6 +853,35 @@ Only primitive strings are accepted. All other inputs, including boxed strings,
 omitted arguments and explicit `undefined`, throw `TypeError` without coercion
 or reading properties on the rejected value.
 
+## Visible ASCII validation
+
+```js
+import { isVisibleAscii } from './lib.mjs';
+
+isVisibleAscii('Hello,world!');        // true
+isVisibleAscii('!~');                  // true (inclusive boundaries)
+isVisibleAscii('');                    // false
+isVisibleAscii('Hello, world!');       // false (space)
+isVisibleAscii('A\n');                 // false (control)
+isVisibleAscii('\x7f');                // false (DEL)
+isVisibleAscii('café');                // false
+isVisibleAscii(String.raw`\u0080`);    // true (literal ASCII escape text)
+isVisibleAscii('\u0080');              // false (actual non-ASCII character)
+isVisibleAscii(new String('ASCII'));   // false
+isVisibleAscii();                      // false
+```
+
+`isVisibleAscii(value)` returns the primitive Boolean `true` exactly for a
+nonempty primitive string containing only U+0021 (`!`) through U+007E (`~`),
+inclusive. Every other input returns primitive `false`, including empty strings,
+spaces, controls, DEL, non-ASCII characters, malformed Unicode and all non-string
+values. Non-string values are rejected without coercion or throwing.
+
+The complete original string is checked without trimming, normalization, case
+folding, escape decoding or byte conversion. Unlike `isAscii`, this helper
+rejects empty strings, spaces, controls and DEL, and returns `false` for
+non-string values instead of throwing `TypeError`.
+
 ## Unicode well-formedness
 
 Import the named `isWellFormedUnicode(text)` function to check UTF-16 surrogate
