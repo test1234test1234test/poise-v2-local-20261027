@@ -1059,6 +1059,23 @@ or separate its number and unit. Nonstring inputs and malformed syntax throw
 `TypeError`; fractional bytes and values above `Number.MAX_SAFE_INTEGER` throw
 `RangeError`. See the [grammar, multipliers and error contract](docs/parse-byte-size.md).
 
+## IEC byte formatting
+
+```js
+import { formatIecBytes } from './lib/format-iec-bytes.mjs';
+
+formatIecBytes(1023);    // '1023 B'
+formatIecBytes(1536n);   // '1.5 KiB'
+formatIecBytes(1048575); // '1.0 MiB'
+```
+
+`formatIecBytes(value)` returns a primitive string for a nonnegative safe-integer
+Number or a nonnegative BigInt of any magnitude. It uses exact half-up rounding
+to one decimal digit above B, promotes rounded `1024.0` values, and caps units
+at EiB while retaining the full decimal magnitude. Other types throw `TypeError`;
+invalid numeric values throw `RangeError`. This display is lossy and is not an
+inverse of `parseByteSize`. See the [formatting and error contract](docs/format-iec-bytes.md).
+
 ## Lazy sorted merge
 
 ```js
