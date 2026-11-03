@@ -107,6 +107,52 @@ paginate([1, 2], max, max).items; // [] (hasPrevious: true, hasNext: false)
 paginate([], max, max).items;     // [] (both navigation flags false)
 ```
 
+## Dense array rotation
+
+```js
+import { rotateArray } from './lib/rotate-array.mjs';
+
+rotateArray(['a', 'b', 'c', 'd'], 1);  // ['d', 'a', 'b', 'c'] (right)
+rotateArray(['a', 'b', 'c', 'd'], -1); // ['b', 'c', 'd', 'a'] (left)
+rotateArray(['a', 'b', 'c', 'd'], 6);  // ['c', 'd', 'a', 'b'] (wraps)
+rotateArray([undefined], 0);           // [undefined] (a fresh array)
+rotateArray([], -0);                  // [] (a fresh array)
+```
+
+`rotateArray(items, steps)` rotates positive steps to the right and negative
+steps to the left, reducing steps modulo the nonempty input's length. Every call
+returns a fresh dense ordinary Array, including zero steps, whole-length wraps,
+singleton inputs and empty inputs. Work is `O(n)` in input length, independent
+of the magnitude of `steps`, with `O(n)` result space.
+
+Both arguments are required and validated even for empty inputs. Non-Array
+`items` or non-number `steps` throw `TypeError` without coercion. Steps must be a
+primitive Number that is a finite safe integer; fractions, `NaN`, infinities and
+unsafe integers throw `RangeError`. Negative zero and both safe-integer extremes
+are valid. Strings, boxed Numbers, BigInts and omitted steps are not accepted.
+Every index from zero through length minus one must be an own property, or
+`TypeError` is thrown, even for zero/full-wrap steps. Inherited indexed properties
+cannot fill holes and their getters are not read. Explicit own `undefined`,
+non-enumerable indices and own indexed accessors are valid.
+
+The helper performs no writes to the input, its prototype or its elements, on
+success or failure. Frozen arrays, Array subclasses, arrays from other realms
+and null-prototype arrays are accepted. Copying is shallow: all element values,
+including `NaN`, signed zeros, objects, nested arrays and repeated references,
+are preserved without inspection or cloning. Replacing a result slot does not
+change the source; modifying a shared nested object is visible through both.
+Input iterators, methods, constructors and `Symbol.species` hooks are not used.
+Output slots are own data properties, even with inherited numeric accessors or
+non-writable properties on `Array.prototype`.
+
+Traversal captures the initial length, checks ownership immediately before each
+indexed read and reads source indices once in ascending order. Getter changes
+to later indices are observed; deleted indices cause hole rejection, while
+appends beyond the captured length are ignored. Caller-thrown getter/proxy
+exceptions propagate unchanged, and caller-hook side effects are not undone.
+Proxies that forward Array length and own-index checks normally are supported;
+arbitrary virtualization of those checks is outside this contract.
+
 ## Numeric clamp
 
 Import the named `clamp(value, min, max)` export from `lib/clamp.mjs`:
