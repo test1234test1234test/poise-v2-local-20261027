@@ -1171,6 +1171,48 @@ obtained value throws, normal IteratorClose attempts the active iterator's
 `return()` and preserves the original error even if cleanup fails. Exhausted
 sources are never closed, and later sources are untouched after a failure.
 
+## Stable topological ordering
+
+```js
+import { stableTopologicalSort } from './lib/stable-topological-sort.mjs';
+
+stableTopologicalSort(['b', 'a', 'c'], [['a', 'b']]); // ['a', 'b', 'c']
+stableTopologicalSort(['z', 'a'], []);              // ['z', 'a']
+stableTopologicalSort([], []);                     // a fresh []
+```
+
+`stableTopologicalSort(vertices, edges)` returns every vertex exactly once, with
+each `[before, after]` edge placing `before` ahead of `after`. At **each selection**,
+the eligible vertex with the smallest position in the original `vertices` array
+wins. In the first example, newly eligible `b` therefore precedes the already
+waiting `c`. Disconnected components and isolated vertices follow the same rule;
+edge order does not break ties. Duplicate directed edges count only once.
+
+Vertices may be any JavaScript values. Identity uses Map/SameValueZero semantics:
+`NaN` matches `NaN`, and `+0` and `-0` are the same vertex identity. Repeated object
+or symbol references are duplicates, while distinct objects or symbols remain
+distinct even if they look alike. Values such as `0`, `0n`, `'0'`, `false`, `null`
+and `undefined` are distinct. No values are coerced, invoked, cloned or flattened.
+The result preserves the original values and references, including signed zero:
+`stableTopologicalSort([-0, 'x'], [['x', +0]])` returns `'x'` followed by the
+original `-0`, as verified with `Object.is(result[1], -0)`.
+
+Both inputs must be dense Arrays, and every edge must be a dense two-element
+Array. Dense means every indexed slot is an **own** property; holes are invalid
+even if an inherited property supplies a value. Explicit `undefined` is valid.
+Invalid containers, malformed edges, holes and duplicate vertices throw
+`TypeError`. An edge endpoint absent from `vertices` throws `RangeError`.
+Validation completes before sorting or cycle diagnosis, including for empty
+graphs. Self-edges and longer cycles throw an `Error` with `error.code === 'CYCLE'`;
+no partial ordering is returned.
+
+Every successful call returns a fresh array, including empty and edgeless calls.
+Inputs, edge tuples and vertex objects are not modified or frozen; frozen input
+arrays and tuples are accepted. Replacing a result slot leaves inputs and other
+results unchanged, while referenced vertex objects remain shared. The helper is
+synchronous and dependency-free. The existing string-only `topologicalSort` API
+retains its separate [validation and cycle-error contract](docs/topological-sort.md).
+
 ## Lazy ordered union
 
 ```js
