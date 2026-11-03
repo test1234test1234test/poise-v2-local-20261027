@@ -1,4 +1,10 @@
 export const baseline = () => 'sandbox';
+export { collectAsync } from './lib/collect-async.mjs';
+
+/** Return whether value is a nonempty primitive string of HTTP token characters. */
+export function isAsciiToken(value) {
+  return typeof value === 'string' && /^[A-Za-z0-9!#$%&'*+.^_`|~-]+$/.test(value);
+}
 
 /** Return whether value is a nonempty primitive string containing only U+0021–U+007E. */
 export function isVisibleAscii(value) {

@@ -104,6 +104,26 @@ its original identity even if cleanup fails. Failed groups are discarded.
 Once natural exhaustion is observed, neither `next()` nor `return()` is called
 on the source again.
 
+## Cancellation-safe collection
+
+```js
+import { collectAsync } from './lib.mjs';
+
+await collectAsync([1, Promise.resolve(2), 3]); // [1, 2, 3]
+await collectAsync([1, 2, 3], { limit: 2 });    // [1, 2]
+```
+
+`collectAsync(iterable, { limit = Infinity, signal } = {})` collects sync or
+async input in order into a fresh array. Limits are validated before acquisition;
+zero and pre-abort do not touch the iterator. Exact limits never request an extra
+value. Truncation and source failure close once; natural exhaustion does not.
+Normal cleanup is awaited, while abort rejects promptly without waiting for a
+pending read or cleanup, observing their late failures and preventing more reads.
+
+See the [exact collection contract](docs/collect-async.md) for promise-valued
+items, close/error precedence, deterministic cancellation races, native signal
+support, listener lifetime and scheduling limits.
+
 ## One-time asynchronous invocation
 
 ```js
@@ -881,6 +901,40 @@ The complete original string is checked without trimming, normalization, case
 folding, escape decoding or byte conversion. Unlike `isAscii`, this helper
 rejects empty strings, spaces, controls and DEL, and returns `false` for
 non-string values instead of throwing `TypeError`.
+
+## ASCII token validation
+
+```js
+import { isAsciiToken } from './lib.mjs';
+
+isAsciiToken('Content-Type');      // true
+isAsciiToken("!#$%&'*+-.^_`|~");   // true (punctuation-only token)
+isAsciiToken('a%2Fb');             // true (literal text, no percent decoding)
+isAsciiToken('');                  // false
+isAsciiToken('two words');         // false
+isAsciiToken('token\n');           // false
+isAsciiToken('a/b');               // false
+isAsciiToken('café');              // false
+isAsciiToken(new String('token')); // false
+isAsciiToken(null);                // false (no coercion)
+isAsciiToken('null');              // true
+isAsciiToken();                    // false
+```
+
+`isAsciiToken(value)` returns Boolean `true` exactly for nonempty primitive
+strings composed entirely of ASCII letters (`A`–`Z`, `a`–`z`), digits (`0`–`9`),
+and these HTTP token punctuation characters:
+
+```text
+! # $ % & ' * + - . ^ _ ` | ~
+```
+
+Every other value returns `false`, including boxed strings, empty strings,
+whitespace, separators, controls, DEL, non-ASCII letters, emoji and lone
+surrogates. Non-string inputs are rejected without coercion or property access.
+The entire original string is checked without trimming, normalization, quote
+removal or escape/percent decoding. There is no length cap or additional
+restriction for a particular header or authentication scheme.
 
 ## Unicode well-formedness
 
