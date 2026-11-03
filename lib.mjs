@@ -1,5 +1,10 @@
 export const baseline = () => 'sandbox';
 
+/** Return whether value is a nonempty primitive string of HTTP token characters. */
+export function isAsciiToken(value) {
+  return typeof value === 'string' && /^[A-Za-z0-9!#$%&'*+.^_`|~-]+$/.test(value);
+}
+
 /** Compare primitive bigints in signed mathematical order, returning Number -1, 0, or 1. */
 export function compareBigInts(a, b) {
   if (typeof a !== 'bigint' || typeof b !== 'bigint') {
