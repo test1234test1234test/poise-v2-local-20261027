@@ -734,6 +734,13 @@ Import `AsyncSemaphore` from `lib/async-semaphore.mjs` for fair, cancellable
 permits that bound concurrent work. Acquire before the work and release in
 `finally`; see [usage and the ownership contract](docs/async-semaphore.md).
 
+## Bounded asynchronous retry
+
+Import `retryAsync` from `lib/retry-async.mjs` to retry an operation sequentially
+with a bounded attempt count, optional decision hook, delay and AbortSignal.
+Cancellation drains an active callback before rejecting. Retry only work the
+caller can safely repeat; see the [API and ownership contract](docs/retry-async.md).
+
 ## Bounded asynchronous channel
 
 ```js
