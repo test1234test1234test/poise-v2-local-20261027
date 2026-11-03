@@ -47,6 +47,63 @@ infinities, and unsafe integers. `Number.MAX_SAFE_INTEGER` is valid; an oversize
 size copies only the available elements, without padding or allocating to that
 size.
 
+## Lazy async batching
+
+```js
+import { batchAsync } from './lib/batch-async.mjs';
+
+for await (const group of batchAsync([1, 2, 3, 4, 5], 2)) {
+  console.log(group); // [1, 2], then [3, 4], then [5]
+}
+```
+
+`batchAsync(source, size)` adapts a synchronous or asynchronous iterable into an
+async iterable of consecutive groups. Each group is a fresh ordinary mutable
+Array with at most `size` elements. A final partial group is yielded once; empty
+sources yield nothing. Items retain their identities: replacing array slots
+does not affect other groups or the source, while shared objects remain shared.
+
+`size` is validated immediately, without accessing the source. It must be a
+primitive number (`TypeError` otherwise) and a positive safe integer
+(`RangeError` otherwise). There is no coercion or default size.
+`Number.MAX_SAFE_INTEGER` is accepted without allocating space ahead of demand.
+
+Source protocol access and iterator acquisition happen only when the first
+`next()` operation actually starts. Constructing the adapter, requesting its
+iterator, or returning/throwing before its first read never inspects the source.
+Each output iterator obtains its own source iterator, so repeatability follows
+the source: arrays are reusable, while a generator instance is typically used
+once. The async protocol takes precedence; an absent/null async method permits
+the sync protocol. Noncallable factories, malformed iterators and nonobject
+iterator results reject with `TypeError`, without falling back from a broken
+async protocol to a sync one.
+
+One requested group reads at most `size` source items, stopping at exhaustion
+or failure. A full group causes no speculative extra read; exhaustion may be
+discovered by the next request. There is no background work or whole-input
+buffering, so consumers can take a bounded number of groups from an infinite
+source. Synchronous sources use async-from-sync semantics: yielded promises and
+thenables are awaited, and rejection fails the group. Async sources preserve
+the values inside their resolved iterator results, including promise-valued
+items, without awaiting those values again.
+
+Each output iterator supports `next()`, `return()` and `throw(error)`. Concurrent
+requests execute in arrival order, with no overlapping source reads. A queued
+return or throw waits for all earlier accepted requests; it does not interrupt
+a pending read. Different output iterators have independent queues and state.
+After completion, later `next()` calls return done without reopening the source.
+
+Early return (including a `for await` loop's `break`), consumer throw, and source
+failure close the opened source through its `return()` method, if present, at
+most once. Cleanup must finish before the operation or later queued requests
+settle, even if a synchronous source returns a promise from `return()`. The
+resolved result must be an object; synchronous cleanup also follows
+async-from-sync value handling. Cleanup failures propagate on an ordinary early
+return. A consumer error, source error or synchronous value rejection retains
+its original identity even if cleanup fails. Failed groups are discarded.
+Once natural exhaustion is observed, neither `next()` nor `return()` is called
+on the source again.
+
 ## Array pagination
 
 ```js
