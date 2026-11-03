@@ -948,6 +948,84 @@ from channel-owned state. Callers may still retain values or result Promises.
 The channel adds no dependencies, timers, background polling or async-iterator
 interface.
 
+## Abortable cyclic asynchronous barrier
+
+```js
+import { createAsyncBarrier } from './lib/async-barrier.mjs';
+
+const barrier = createAsyncBarrier(3);
+await Promise.all([barrier.wait(), barrier.wait(), barrier.wait()]); // [0, 0, 0]
+await Promise.all([barrier.wait(), barrier.wait(), barrier.wait()]); // [1, 1, 1]
+barrier.close('finished'); // true
+```
+
+Start every participant before awaiting the group; awaiting the first arrival
+alone would prevent the other arrivals from joining. `createAsyncBarrier(parties)`
+requires a primitive number (`TypeError` otherwise) that is a positive safe
+integer (`RangeError` otherwise), without coercion or a default. Even `2 ** 32`
+and `Number.MAX_SAFE_INTEGER` are accepted: storage follows actual arrivals,
+with no allocation or loop proportional to the configured party count.
+
+`wait({ signal } = {})` always returns a Promise. Every full group of `parties`
+live arrivals fulfills with the same zero-based generation number. The final
+successful admission commits the round **synchronously before `wait()` returns**:
+pending entries and their abort listeners are removed, and generation advances
+before any fulfillment callback runs. Later arrivals, including arrivals from a
+previous round's callbacks, join the next round. Later abort or close cannot
+change a released result. With one party, each valid arrival completes its own
+round immediately.
+
+Successful admissions and group membership are FIFO, as is settlement within
+each round. Direct reactions attached as arrivals are submitted run in that
+order; arbitrarily late reaction registration has no global FIFO guarantee.
+`pending`, `generation` and `closed` are getter-only properties, initially
+`0`, `0` and `false`. Pending counts live, unreleased arrivals, excluding signals
+already aborted even inside an earlier caller abort listener. Reading it scans
+the queued arrivals. Only a complete round advances generation; abort and close
+never advance or reset it. Instances have independent state.
+
+Options may be omitted or `undefined`; otherwise they must be non-null,
+non-array objects, including class instances and null-prototype objects.
+`options.signal` is read once, including inherited getters. Missing/undefined
+means no signal, and unrelated keys are ignored. Signals must be native signals
+with this realm's `AbortSignal.prototype`, such as controller signals,
+`AbortSignal.abort()` and `AbortSignal.any()`. Null, duck types, proxies, inherited
+wrappers, prototype-only imitations and foreign-prototype signals are rejected.
+Own properties shadowing `aborted`, `reason`, `addEventListener` or
+`removeEventListener` are also rejected without invoking them. Modifying those
+members after admission, native signal internals or platform prototypes is
+outside the supported boundary.
+
+Validation precedes the closed check, then pre-abort, then admission. Invalid
+inputs reject with `TypeError`; a throwing options getter rejects with its exact
+thrown value. Failed calls do not admit an arrival or install a listener. Caller
+getters can still perform their own side effects: nested waits are admitted
+first, and state is rechecked after validation so a getter's close or abort takes
+effect before the outer admission.
+
+An already-aborted signal never joins. Aborting a waiting arrival removes only
+that arrival and rejects with its exact signal reason, including undefined,
+without changing the required party count. Survivors need replacement arrivals
+or an explicit close. Owned listeners are detached on release, abort and close
+without removing caller or other instances' listeners. Node's
+[`addAbortListener`](https://nodejs.org/docs/latest-v22.x/api/events.html#eventsaddabortlistenersignal-listener)
+prevents `stopImmediatePropagation()` from suppressing cancellation. Synthetic
+abort events on a live signal do not cancel arrivals; their one-shot listeners
+are re-armed in a microtask that also checks for real aborts during the gap.
+Settled records are unlinked, their references cleared, and cannot be re-armed.
+
+`close(reason)` synchronously sets closed, clears pending entries/listeners and
+rejects all waiting and future valid waits with its first exact reason. It
+returns `true` the first time and `false` thereafter. `close()` and
+`close(undefined)` retain literal undefined, even if later calls supply another
+reason. Rejection reasons are never coerced or awaited. Future valid waits get
+the close reason even with a pre-aborted signal; invalid calls still get their
+validation failure. A queued arrival whose abort is already dispatching keeps
+its abort reason if an earlier caller abort listener closes the barrier; other
+live arrivals receive the close reason. Closing before abort instead preserves
+the close reason. The barrier adds no timers, dependencies or shared mutable
+state.
+
 ## Keyed serial executor
 
 ```js
