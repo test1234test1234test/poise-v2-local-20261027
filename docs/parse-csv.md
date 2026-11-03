@@ -92,14 +92,28 @@ parseCsv('"\uFEFF"', { delimiter: '\uFEFF' }); // [['\uFEFF']]
 ```
 
 Malformed CSV throws `SyntaxError` with integer, one-based `line` and `column`
-properties. No partial rows are returned. The position identifies the first
-offending input character; an unterminated quoted field points at the position
-immediately after the last input character. Coordinates refer to the original
-input, including the removed leading BOM. Columns count UTF-16 code units.
+properties and an additive `offset` property. `offset` is a zero-based integer
+UTF-16 code-unit index into the original input, with `0 <= offset <= text.length`.
+No partial rows are returned. The position identifies the first offending code
+unit (the high surrogate for an offending supplementary character). An
+unterminated quoted field reports `offset === text.length`, immediately after
+the last input character, rather than the opening quote. Coordinates include
+the ignored initial BOM. Both code units of a surrogate pair, both characters
+of CRLF, and both source quotes in an escape count toward `offset`.
+Columns also count UTF-16 code units.
 LF and CRLF each advance one line and reset the column to 1, even inside a
 quoted field. A quoted bare CR advances the column by one without changing
 the line. A BOM adds one column only on its original line.
 
-For example, `'😀"'` fails at `(1, 3)`, `'\uFEFF"a"x'` fails at `(1, 5)`,
-`'"a\r\nb"x'` fails at `(2, 3)`, and `'"a\r\n'` fails at EOF `(2, 1)`.
+| Input (JavaScript literal) | `line` | `column` | `offset` |
+| --- | --- | --- | --- |
+| `'\r'` | 1 | 1 | 0 |
+| `'😀"'` | 1 | 3 | 2 |
+| `'\uFEFF"a"x'` | 1 | 5 | 4 |
+| `'"a\r\nb"x'` | 2 | 3 | 6 |
+| `'"a\r\n'` | 2 | 1 | 4 (EOF) |
+
+The additional property does not change error messages, line/column values, or
+argument-validation errors. Caller exceptions from option access propagate
+unchanged without added coordinates.
 Error-message wording is not part of the API contract.

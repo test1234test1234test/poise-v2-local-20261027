@@ -574,6 +574,28 @@ Import `AsyncSemaphore` from `lib/async-semaphore.mjs` for fair, cancellable
 permits that bound concurrent work. Acquire before the work and release in
 `finally`; see [usage and the ownership contract](docs/async-semaphore.md).
 
+## CSV parsing
+
+```js
+import { parseCsv } from './lib/parse-csv.mjs';
+
+parseCsv('name,city\r\nAda,"London"\r\n'); // [['name', 'city'], ['Ada', 'London']]
+parseCsv('a;"b;c"', { delimiter: ';' });   // [['a', 'b;c']]
+
+try {
+  parseCsv('\uFEFF"😀"x');
+} catch (error) {
+  console.log(error.line, error.column, error.offset); // 1 6 5
+}
+```
+
+Malformed records throw `SyntaxError` with one-based `line` and `column` and an
+additive zero-based integer `offset` in original-input UTF-16 code units. The
+offset includes an ignored initial BOM and both code units of a surrogate pair;
+an unclosed quoted field reports `text.length`. Existing messages, coordinates,
+and validation errors are unchanged. See the [CSV documentation](docs/parse-csv.md)
+for the strict grammar, delimiters, and error-coordinate examples.
+
 ## Query string parsing
 
 Import `parseQueryString` from `./lib/parse-query-string.mjs` to parse query text
